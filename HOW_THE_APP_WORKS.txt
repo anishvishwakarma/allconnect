@@ -1,0 +1,312 @@
+================================================================================
+  ALLCONNECT — HOW THE APP WORKS (Plain language, no coding needed)
+================================================================================
+
+This file explains what the app does, where data is stored, what "backend"
+and "database" mean, and how everything fits together. Think of it as a
+map of the whole system.
+
+================================================================================
+1. WHAT IS THE APP?
+================================================================================
+
+AllConnect is a mobile app where people can:
+  - Sign in with their phone number (India, +91)
+  - Create "posts" (e.g. "Coffee meetup tomorrow at 5 PM")
+  - See posts from others on a map
+  - Request to "join" someone's post
+  - If the host approves, they get into a group chat with others going to
+    that same event
+  - Chat in real time, edit profile, change theme (light/dark), sign out,
+    or delete their account
+
+So: people find activities nearby, request to join, get approved, and then
+chat with the group. All of that needs a place to store data (phone numbers,
+names, posts, messages) and a "server" that the phone talks to. That is
+what we build with "backend" and "database."
+
+================================================================================
+2. TWO PARTS: THE PHONE APP AND THE SERVER
+================================================================================
+
+Your project has two main parts:
+
+  (A) THE MOBILE APP (the "frontend")
+      - This is what the user sees and touches on their phone.
+      - It lives in the "mobile" folder.
+      - It does NOT store user data permanently by itself. It only keeps
+        a copy of "who is logged in" and "their name/photo" on the device
+        so the user does not have to log in every time.
+      - For everything else (saving a new post, loading the map, sending
+        a message), the app asks the "backend" to do it.
+
+  (B) THE BACKEND (the "server" or "API")
+      - This is a program that runs on a computer (your laptop at first,
+        later a "cloud" computer).
+      - It lives in the "backend" folder.
+      - It receives requests from the app (e.g. "Save this post", "Give me
+        messages for this chat") and talks to the database to read or write
+        data. Then it sends a response back to the app.
+
+So: the app on the phone is like a "client." The backend is like a "waiter"
+that takes orders from the client and brings data from the "kitchen" (the
+database). The database is where all the real data is stored.
+
+================================================================================
+3. WHAT IS THE DATABASE? WHO SAVES THE DATA?
+================================================================================
+
+The database is a structured storage system. In our case we use "PostgreSQL"
+(a type of database) hosted by Supabase (a company that gives you a
+database in the cloud).
+
+  - The DATABASE stores:
+    - Users (phone number, name, email, profile picture link, etc.)
+    - OTP codes (the 6-digit code we send to your phone for login)
+    - Posts (title, category, place on map, date/time, who created it)
+    - Join requests (who asked to join which post, approved or not)
+    - Group chats (one chat per post, when people are approved)
+    - Messages (each line of chat, who wrote it, when)
+
+  - WHO saves the data?
+    - The USER does things in the app (tap "Create post", type a message).
+    - The APP sends that to the BACKEND (e.g. "Create a post with this
+      title and location").
+    - The BACKEND checks that the user is logged in, then writes the new
+      row into the DATABASE (e.g. into the "posts" table).
+    - So: user action → app → backend → database. The "backend" is the
+      program that actually reads and writes the database; the app never
+      talks to the database directly.
+
+  - Where is the database?
+    - When you follow STEP_BY_STEP.md, you create a project on Supabase.
+    - Supabase gives you a "connection string" (a secret URL) that points
+      to your database. That database is stored on Supabase's computers
+      (in the cloud), not on your phone or your laptop.
+    - Your backend runs somewhere (your laptop, or later a server). It
+      uses that connection string to connect to the database and run
+      commands like "insert this user" or "give me all posts near this
+      location."
+
+================================================================================
+4. WHAT IS "BACKEND" AND "API"?
+================================================================================
+
+  - BACKEND = the server program (in the "backend" folder).
+    - It listens on a "port" (e.g. 4000). So when it runs, it is waiting
+      at something like: http://localhost:4000
+    - The mobile app is configured with that address (in mobile .env as
+      EXPO_PUBLIC_API_URL). So every time the app needs to save or load
+      data, it sends an HTTP request to that address (e.g. POST
+      http://localhost:4000/api/posts to create a post).
+
+  - API = the set of "endpoints" (URLs) that the backend offers.
+    - Each endpoint is like a small task. Examples:
+      - POST /api/auth/send-otp   → send OTP to this phone number
+      - POST /api/auth/verify-otp → check the code and log the user in
+      - GET  /api/users/me        → get my profile
+      - PATCH /api/users/me      → update my name/email
+      - GET  /api/posts/nearby    → get posts near this lat/lng
+      - POST /api/posts           → create a new post
+      - POST /api/posts/:id/request → request to join a post
+      - GET  /api/chats/groups    → get my group chats
+      - POST /api/chats/groups/:id/messages → send a message
+      - DELETE /api/users/me      → delete my account and data
+    - The app calls these URLs (with the user's "token" so the backend
+      knows who is logged in). The backend then does the work (database
+      read/write) and returns JSON (a data format) back to the app.
+
+So: "Backend" is the program. "API" is the list of operations that program
+exposes so the app can ask it to do things. "Database" is where the backend
+stores and reads the real data.
+
+================================================================================
+5. HOW DOES EACH FEATURE WORK? (Step by step)
+================================================================================
+
+  LOGIN (phone + OTP)
+  - User enters phone number. App sends it to: POST /api/auth/send-otp
+  - Backend creates a 6-digit code, saves it in the database (otp_codes
+    table) with an expiry time, and (if Twilio is set) sends SMS. Otherwise
+    it just prints the code in the backend terminal.
+  - User enters the code. App sends: POST /api/auth/verify-otp with phone
+    and code.
+  - Backend checks the code in the database. If correct, it either finds
+    the user by phone or creates a new user row, then creates a "token"
+    (like a temporary key) and returns token + user to the app.
+  - App saves token and user in the phone's storage and uses the token for
+    all later requests so the backend knows "this is John."
+
+  COMPLETE PROFILE
+  - User enters name (and optional email/photo). App sends: PATCH
+    /api/users/me with name, email.
+  - Backend updates the user row in the database. App also updates its
+    local copy of the user.
+
+  MAP AND POSTS
+  - App gets the phone's location (with permission). It sends: GET
+    /api/posts/nearby?lat=...&lng=...&radius_km=15
+  - Backend runs a query on the database (posts table) and returns posts
+    near that location. App shows them as pins on the map.
+
+  CREATE POST
+  - User fills the form (title, category, location, date, etc.). App
+    sends: POST /api/posts with all that data.
+  - Backend inserts a new row in "posts" and (for free-tier) increments
+    the user's "posts_this_month" in the users table. Returns the
+    created post. App can then show it on the map.
+
+  REQUEST TO JOIN
+  - User taps "Request to join" on a post. App sends: POST
+    /api/posts/:postId/request
+  - Backend inserts a row in "join_requests" with status "pending." The
+    host can later see this list.
+
+  APPROVE / REJECT (host)
+  - Host taps Approve. App sends: POST /api/posts/:postId/approve with
+    user_id of the requester.
+  - Backend updates the join_request to "approved," ensures a "group_chat"
+    exists for that post, and adds both host and approved user to
+    "group_chat_members" and "post_participations." So the approved user
+    can now see the chat and send messages.
+
+  GROUP CHAT AND MESSAGES
+  - User opens a chat. App loads messages: GET
+    /api/chats/groups/:groupId/messages. Backend returns rows from the
+    "messages" table for that group.
+  - User types and sends. App sends: POST /api/chats/groups/:groupId/messages
+    with body text. Backend inserts a row in "messages" and then broadcasts
+    that message to everyone in that group via "Socket.io" (real-time
+    connection). So other people see the message without refreshing.
+  - Socket.io is a separate channel (same server, different protocol) so
+    the server can "push" new messages to all connected clients in that
+    chat room.
+
+  PROFILE AND SETTINGS
+  - Profile: GET /api/users/me loads latest user data from database.
+    Edit profile uses PATCH /api/users/me. Sign out: app just deletes the
+    token and user from the phone and goes to login screen (no backend
+    call needed).
+  - Settings: Theme (light/dark) is saved only on the phone. Sign out and
+    Delete account: Sign out same as above. Delete account: app calls
+    DELETE /api/users/me; backend deletes the user row from the database
+    (and because of "cascade," all their posts, join_requests, messages
+    etc. are removed too). Then app clears token and goes to login.
+
+So in every case: the app sends a request to the backend; the backend
+reads or writes the database and (for chat) pushes updates via Socket.io;
+the app shows the result to the user.
+
+================================================================================
+6. WHAT DOES "DEPLOY" MEAN? WHERE TO DEPLOY?
+================================================================================
+
+  - Right now (when you follow STEP_BY_STEP.md):
+    - Backend runs on YOUR LAPTOP (localhost:4000). The database is
+      already in the cloud (Supabase). The app on your phone (or emulator)
+      talks to your laptop's IP (e.g. 192.168.1.5:4000) so they must be
+      on the same Wi‑Fi.
+    - This is only for development. If you close the laptop or leave the
+      network, the app cannot reach the backend.
+
+  - DEPLOY = put the backend program on a computer that is always on and
+    reachable from the internet, so that:
+    - Any user, anywhere, can use the app as long as the app is pointed
+      to that server's URL (e.g. https://your-app.railway.app).
+    - The database (Supabase) stays where it is; you do not "deploy" the
+      database. You only deploy the backend. The deployed backend still
+      connects to the same Supabase database using the same DATABASE_URL.
+
+  - WHERE to deploy the backend?
+    - You need a "host" that runs Node.js and gives you a public URL.
+    - Examples (all have free or cheap tiers):
+      - Railway (railway.app)
+      - Render (render.com)
+      - Fly.io (fly.io)
+      - Heroku, DigitalOcean, etc.
+    - You connect your GitHub/code to the host, set the folder to "backend,"
+      set environment variables (DATABASE_URL, JWT_SECRET, Twilio if you
+      use it), and the host runs "npm install" and "npm start" (or "node
+      index.js"). They give you a URL like https://allconnect-api.railway.app.
+    - You run "npm run db:init" once (either from your laptop with
+      DATABASE_URL pointing to Supabase, or as a one-off command on the
+      host) to create the tables. After that, the deployed backend uses
+      the same tables.
+
+  - Where to "deploy" the app (the mobile app)?
+    - The mobile app is not "deployed" like a website. You BUILD it:
+      - For Android: you create an "APK" or "AAB" file and upload it to
+        Google Play Console.
+      - For iOS: you upload the build to App Store Connect (using Xcode
+        or a service like EAS).
+    - Before building, you set the app's API URL to your deployed backend
+      (e.g. EXPO_PUBLIC_API_URL=https://your-app.railway.app). So when
+      users install the app from the store, it talks to your backend in
+      the cloud, and the backend talks to Supabase. No one's phone talks
+      to your laptop.
+
+Summary:
+  - Database (Supabase) = in the cloud, you already set it up.
+  - Backend = deploy to Railway/Render/Fly.io (or similar) so it has a
+    public URL and runs 24/7.
+  - Mobile app = build and upload to Google Play and/or App Store; the
+    app is configured to use your deployed backend URL.
+
+================================================================================
+7. QUICK REFERENCE: WHO DOES WHAT
+================================================================================
+
+  - USER
+    - Uses the app on the phone: login, create post, send message, etc.
+
+  - MOBILE APP (frontend)
+    - Shows screens and buttons.
+    - Sends HTTP requests to the backend (and keeps token/user on device).
+    - Opens Socket.io connection for real-time chat.
+    - Does NOT store posts/messages permanently; it only displays what the
+      backend sends.
+
+  - BACKEND (server / API)
+    - Receives requests from the app (with token so it knows the user).
+    - Reads and writes the database (create user, save post, save message,
+      delete user, etc.).
+    - Sends OTP via Twilio (or logs it) and checks OTP on verify.
+    - Broadcasts new chat messages to the right group via Socket.io.
+    - Returns JSON responses to the app (e.g. list of posts, list of
+      messages).
+
+  - DATABASE (Supabase / PostgreSQL)
+    - Stores: users, otp_codes, posts, join_requests, group_chats,
+      group_chat_members, messages, post_participations.
+    - Only the backend talks to the database. The app never connects to
+      the database directly.
+
+  - SOCKET.IO
+    - Part of the same backend server. Keeps a live connection with each
+      app that is in a chat screen. When someone sends a message, the
+      backend saves it to the database and then pushes it to all clients
+      in that chat room so they see it immediately.
+
+================================================================================
+8. FILE AND FOLDER MEANING (short)
+================================================================================
+
+  - backend/
+    - The server program. Runs with "npm run dev" or "npm start."
+    - index.js = entry; routes = auth, users, posts, requests, chats;
+      db.js = database connection; schema.sql = table definitions.
+  - mobile/
+    - The phone app. Runs with "npx expo start."
+    - app/ = screens (login, map, profile, settings, chat, etc.);
+      services/api.ts = all calls to the backend; store/auth.ts = logged-in
+      user and token.
+  - STEP_BY_STEP.md
+    - The only guide you need to get database + backend + app connected
+      and fully working.
+  - STORE_CHECKLIST.md
+    - What to do when you want to publish the app on Play Store and App
+      Store (privacy policy, terms, account deletion, etc.).
+
+================================================================================
+END OF GUIDE
+================================================================================
