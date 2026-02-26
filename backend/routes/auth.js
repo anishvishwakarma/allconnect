@@ -4,6 +4,7 @@ const db = require('../db');
 const { signToken } = require('../middleware/auth');
 const { sendOtpSms } = require('../services/sms');
 const { rateLimitOtp } = require('../middleware/rateLimitOtp');
+const { rateLimitAuth } = require('../middleware/rateLimitAuth');
 const { verifyIdToken } = require('../services/firebase');
 
 const router = express.Router();
@@ -92,34 +93,63 @@ router.post('/verify-otp', async (req, res) => {
   }
 });
 
-// POST /api/auth/firebase — verify Firebase ID token, return our JWT (email auth)
+// GET /api/auth/email-for-login?mobile= — get email for login-by-mobile (rate limited)
+router.get('/email-for-login', rateLimitAuth, async (req, res) => {
+  try {
+    const mobile = normalizeMobile(req.query?.mobile);
+    if (!mobile) return res.status(400).json({ error: 'Valid mobile required' });
+    const user = await db.row('SELECT email FROM users WHERE mobile = $1 AND email IS NOT NULL', [mobile]);
+    if (!user || !user.email) return res.status(404).json({ error: 'No account found for this mobile' });
+    return res.json({ email: user.email });
+  } catch (err) {
+    console.error('email-for-login', err);
+    return res.status(500).json({ error: 'Could not lookup account' });
+  }
+});
+
+// POST /api/auth/firebase — verify Firebase ID token, return our JWT (email+password auth)
+// For registration: send mobile in body to store with email (both required at signup)
 router.post('/firebase', async (req, res) => {
   try {
     const idToken = (req.body?.idToken || req.body?.id_token || '').trim();
+    const mobile = normalizeMobile(req.body?.mobile);
     if (!idToken) return res.status(400).json({ error: 'idToken required' });
 
     const decoded = await verifyIdToken(idToken);
     if (!decoded || !decoded.email) return res.status(401).json({ error: 'Invalid or expired token' });
 
-    const email = decoded.email;
-    const firebaseUid = decoded.uid;
+    const email = decoded.email.toLowerCase();
     const name = decoded.name || decoded.displayName || null;
-
-    // Use "email:user@example.com" as mobile for email users (schema requires mobile)
-    const mobilePlaceholder = 'email:' + email.toLowerCase();
+    const mobilePlaceholder = 'email:' + email;
 
     let user = await db.row('SELECT * FROM users WHERE email = $1 OR mobile = $2', [email, mobilePlaceholder]);
     if (!user) {
+      // New user — mobile is required at registration (sent from client)
+      const storeMobile = mobile || mobilePlaceholder;
+      if (!mobile) {
+        return res.status(400).json({ error: 'Mobile number required at registration' });
+      }
+      // Check mobile not already used
+      const existing = await db.row('SELECT id FROM users WHERE mobile = $1', [storeMobile]);
+      if (existing) return res.status(400).json({ error: 'Mobile number already in use' });
       const id = uuidv4();
       await db.query(
         `INSERT INTO users (id, mobile, name, email, avatar_uri, kyc_verified, posts_this_month, subscription_ends_at)
          VALUES ($1, $2, $3, $4, NULL, FALSE, 0, NULL)`,
-        [id, mobilePlaceholder, name, email]
+        [id, storeMobile, name, email]
       );
       user = await db.row('SELECT * FROM users WHERE id = $1', [id]);
-    } else if (!user.email) {
-      await db.query('UPDATE users SET email = $1, name = COALESCE(name, $2), updated_at = NOW() WHERE id = $3', [email, name, user.id]);
-      user = await db.row('SELECT * FROM users WHERE id = $1', [user.id]);
+    } else {
+      // Existing user — update mobile if provided and different from placeholder
+      if (mobile && user.mobile === mobilePlaceholder) {
+        const existing = await db.row('SELECT id FROM users WHERE mobile = $1', [mobile]);
+        if (existing && existing.id !== user.id) return res.status(400).json({ error: 'Mobile number already in use' });
+        await db.query('UPDATE users SET mobile = $1, name = COALESCE(name, $2), updated_at = NOW() WHERE id = $3', [mobile, name, user.id]);
+        user = await db.row('SELECT * FROM users WHERE id = $1', [user.id]);
+      } else if (!user.email) {
+        await db.query('UPDATE users SET email = $1, name = COALESCE(name, $2), updated_at = NOW() WHERE id = $3', [email, name, user.id]);
+        user = await db.row('SELECT * FROM users WHERE id = $1', [user.id]);
+      }
     }
 
     const token = signToken({ userId: user.id });

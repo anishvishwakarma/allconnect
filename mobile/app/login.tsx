@@ -30,13 +30,27 @@ import {
 const PRIMARY = "#E8751A";
 const PRIMARY_LIGHT = "#FFF3E8";
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function isEmail(input: string): boolean {
+  return EMAIL_REGEX.test((input || "").trim());
+}
+
+function normalizeMobile(input: string): string {
+  const digits = (input || "").replace(/\D/g, "");
+  if (digits.length >= 10) return "+91" + digits.slice(-10);
+  return "";
+}
+
 export default function LoginScreen() {
   const setAuth = useAuthStore((s) => s.setAuth);
   const insets = useSafeAreaInsets();
   const { isDark } = useAppTheme();
   const [mode, setMode] = useState<"signin" | "signup" | "forgot">("signin");
-  const [email, setEmail] = useState("");
+  const [emailOrMobile, setEmailOrMobile] = useState("");
+  const [mobile, setMobile] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const bg = isDark ? "#0C0C0F" : "#FAFAFA";
@@ -47,10 +61,10 @@ export default function LoginScreen() {
   const inputBg = isDark ? "#252528" : "#F5F5F7";
 
   async function handleSignIn() {
-    const e = email.trim().toLowerCase();
+    const input = emailOrMobile.trim();
     const p = password;
-    if (!e || !p) {
-      Alert.alert("Required", "Enter email and password.");
+    if (!input || !p) {
+      Alert.alert("Required", "Enter email or mobile and password.");
       return;
     }
     if (p.length < 6) {
@@ -59,29 +73,57 @@ export default function LoginScreen() {
     }
     setLoading(true);
     try {
-      const cred = await signInWithEmail(e, p);
+      let email = "";
+      if (isEmail(input)) {
+        email = input.toLowerCase();
+      } else {
+        const mob = normalizeMobile(input);
+        if (!mob) {
+          Alert.alert("Invalid", "Enter a valid email or 10-digit mobile number.");
+          setLoading(false);
+          return;
+        }
+        const res = await authApi.getEmailForLogin(mob);
+        email = res.email;
+      }
+      const cred = await signInWithEmail(email, p);
       const idToken = await getIdToken(cred.user);
       const { token, user } = await authApi.firebaseLogin(idToken);
       setAuth(token, user);
       router.replace(user.name?.trim() ? "/(tabs)/map" : "/complete-profile");
     } catch (err: any) {
       const msg = err?.message || "Sign in failed.";
-      if (msg.includes("user-not-found") || msg.includes("wrong-password"))
-        Alert.alert("Sign in failed", "Invalid email or password.");
+      if (msg.includes("user-not-found") || msg.includes("wrong-password") || msg.includes("404"))
+        Alert.alert("Sign in failed", "Invalid email/mobile or password.");
+      else if (msg.includes("Too many attempts"))
+        Alert.alert("Try again later", "Too many login attempts. Please wait a few minutes.");
       else if (msg.includes("email-not-verified"))
         Alert.alert("Email not verified", "Check your inbox and verify your email first.");
-      else
-        Alert.alert("Error", msg);
+      else if (msg.includes("No account found"))
+        Alert.alert("Sign in failed", "No account found for this mobile.");
+      else if (msg.includes("Network error"))
+        Alert.alert("Connection error", "Check your internet connection and try again.");
+      else Alert.alert("Error", msg);
     } finally {
       setLoading(false);
     }
   }
 
   async function handleSignUp() {
-    const e = email.trim().toLowerCase();
+    const e = emailOrMobile.trim().toLowerCase();
+    const m = mobile.trim();
     const p = password;
-    if (!e || !p) {
-      Alert.alert("Required", "Enter email and password.");
+    if (!e || !m || !p) {
+      Alert.alert("Required", "Enter email, mobile number and password.");
+      return;
+    }
+    if (!isEmail(e)) {
+      Alert.alert("Invalid", "Enter a valid email address.");
+      return;
+    }
+    const mob = normalizeMobile(m);
+    if (!mob) {
+      Alert.alert("Invalid", "Enter a valid 10-digit mobile number.");
       return;
     }
     if (p.length < 6) {
@@ -92,7 +134,7 @@ export default function LoginScreen() {
     try {
       const cred = await signUpWithEmail(e, p);
       const idToken = await getIdToken(cred.user);
-      const { token, user } = await authApi.firebaseLogin(idToken);
+      const { token, user } = await authApi.firebaseLogin(idToken, mob);
       setAuth(token, user);
       Alert.alert(
         "Verify your email",
@@ -103,24 +145,40 @@ export default function LoginScreen() {
       const msg = err?.message || "Sign up failed.";
       if (msg.includes("email-already-in-use"))
         Alert.alert("Email in use", "An account with this email already exists. Try signing in.");
+      else if (msg.includes("Mobile number already"))
+        Alert.alert("Mobile in use", "This mobile number is already registered.");
       else if (msg.includes("weak-password"))
         Alert.alert("Weak password", "Use at least 6 characters.");
-      else
-        Alert.alert("Error", msg);
+      else if (msg.includes("Network error"))
+        Alert.alert("Connection error", "Check your internet connection and try again.");
+      else Alert.alert("Error", msg);
     } finally {
       setLoading(false);
     }
   }
 
   async function handleForgotPassword() {
-    const e = email.trim().toLowerCase();
-    if (!e) {
-      Alert.alert("Required", "Enter your email address.");
+    const input = emailOrMobile.trim();
+    if (!input) {
+      Alert.alert("Required", "Enter your email or mobile number.");
       return;
     }
     setLoading(true);
     try {
-      await sendPasswordReset(e);
+      let email = "";
+      if (isEmail(input)) {
+        email = input.toLowerCase();
+      } else {
+        const mob = normalizeMobile(input);
+        if (!mob) {
+          Alert.alert("Invalid", "Enter a valid email or 10-digit mobile number.");
+          setLoading(false);
+          return;
+        }
+        const res = await authApi.getEmailForLogin(mob);
+        email = res.email;
+      }
+      await sendPasswordReset(email);
       Alert.alert(
         "Check your email",
         "We sent a password reset link to your email. Check your inbox and spam folder."
@@ -128,14 +186,29 @@ export default function LoginScreen() {
       setMode("signin");
     } catch (err: any) {
       const msg = err?.message || "Could not send reset email.";
-      if (msg.includes("user-not-found"))
-        Alert.alert("Not found", "No account exists with this email.");
-      else
-        Alert.alert("Error", msg);
+      if (msg.includes("user-not-found") || msg.includes("404"))
+        Alert.alert("Not found", "No account found for this email or mobile.");
+      else if (msg.includes("Too many attempts"))
+        Alert.alert("Try again later", "Too many attempts. Please wait a few minutes.");
+      else if (msg.includes("Network error"))
+        Alert.alert("Connection error", "Check your internet connection and try again.");
+      else Alert.alert("Error", msg);
     } finally {
       setLoading(false);
     }
   }
+
+  const getPlaceholder = () => {
+    if (mode === "signup") return "your@email.com";
+    if (mode === "forgot") return "Email or mobile number";
+    return "Email or mobile number";
+  };
+
+  const getKeyboardType = () => {
+    if (mode === "signup" && !emailOrMobile.includes("@")) return "email-address";
+    if (mode === "forgot" || mode === "signin") return "default";
+    return "email-address";
+  };
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
@@ -171,20 +244,43 @@ export default function LoginScreen() {
               <View style={[s.sectionIcon, { backgroundColor: PRIMARY_LIGHT }]}>
                 <Ionicons name="mail-outline" size={18} color={PRIMARY} />
               </View>
-              <Text style={[s.sectionTitle, { color: textColor }]}>Email</Text>
+              <Text style={[s.sectionTitle, { color: textColor }]}>
+                {mode === "signup" ? "Email" : "Email or mobile"}
+              </Text>
             </View>
-            <View style={[s.inputWrapper, { backgroundColor: inputBg, borderColor: email.includes("@") ? PRIMARY : borderColor }]}>
+            <View style={[s.inputWrapper, { backgroundColor: inputBg, borderColor: (mode === "signup" ? emailOrMobile.includes("@") : emailOrMobile.length > 0) ? PRIMARY : borderColor }]}>
               <TextInput
-                value={email}
-                onChangeText={setEmail}
-                placeholder="your@email.com"
+                value={emailOrMobile}
+                onChangeText={setEmailOrMobile}
+                placeholder={getPlaceholder()}
                 placeholderTextColor={isDark ? "#555" : "#C0C0C0"}
-                keyboardType="email-address"
+                keyboardType={getKeyboardType()}
                 autoCapitalize="none"
                 autoCorrect={false}
                 style={[s.input, { color: textColor }]}
               />
             </View>
+
+            {mode === "signup" && (
+              <>
+                <View style={s.sectionHeader}>
+                  <View style={[s.sectionIcon, { backgroundColor: PRIMARY_LIGHT }]}>
+                    <Ionicons name="call-outline" size={18} color={PRIMARY} />
+                  </View>
+                  <Text style={[s.sectionTitle, { color: textColor }]}>Mobile number</Text>
+                </View>
+                <View style={[s.inputWrapper, { backgroundColor: inputBg, borderColor: normalizeMobile(mobile).length >= 13 ? PRIMARY : borderColor }]}>
+                  <TextInput
+                    value={mobile}
+                    onChangeText={setMobile}
+                    placeholder="10-digit mobile number"
+                    placeholderTextColor={isDark ? "#555" : "#C0C0C0"}
+                    keyboardType="phone-pad"
+                    style={[s.input, { color: textColor }]}
+                  />
+                </View>
+              </>
+            )}
 
             {mode !== "forgot" && (
               <>
@@ -200,9 +296,20 @@ export default function LoginScreen() {
                     onChangeText={setPassword}
                     placeholder="••••••••"
                     placeholderTextColor={isDark ? "#555" : "#C0C0C0"}
-                    secureTextEntry
+                    secureTextEntry={!showPassword}
                     style={[s.input, { color: textColor }]}
                   />
+                  <TouchableOpacity
+                    onPress={() => setShowPassword((v) => !v)}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                    style={s.passwordToggle}
+                  >
+                    <Ionicons
+                      name={showPassword ? "eye-off-outline" : "eye-outline"}
+                      size={22}
+                      color={subColor}
+                    />
+                  </TouchableOpacity>
                 </View>
               </>
             )}
@@ -272,7 +379,10 @@ export default function LoginScreen() {
                   : "Don't have an account? "}
               </Text>
               <TouchableOpacity
-                onPress={() => setMode(mode === "forgot" ? "signin" : mode === "signup" ? "signin" : "signup")}
+                onPress={() => {
+                  setMode(mode === "forgot" ? "signin" : mode === "signup" ? "signin" : "signup");
+                  if (mode === "signup") setMobile("");
+                }}
               >
                 <Text style={[s.linkText, { color: PRIMARY }]}>
                   {mode === "forgot" ? "Sign in" : mode === "signup" ? "Sign in" : "Sign up"}
@@ -353,6 +463,7 @@ const s = StyleSheet.create({
     paddingVertical: Platform.OS === "ios" ? 16 : 10,
   },
   input: { flex: 1, fontSize: 16, fontWeight: "500" },
+  passwordToggle: { paddingLeft: 8 },
   forgotLink: { alignSelf: "flex-end", marginTop: 12 },
   linkText: { fontSize: 14, fontWeight: "600" },
   primaryButton: {

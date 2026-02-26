@@ -1,0 +1,39 @@
+================================================================================
+  ALLCONNECT — DEPLOY CHECKLIST (Render + Mobile)
+================================================================================
+
+BACKEND (Render — https://allconnect.onrender.com)
+--------------------------------------------------------------------------------
+[ ] Environment variables in Render Dashboard:
+    - PORT (auto or 4000)
+    - DATABASE_URL
+    - JWT_SECRET
+    - FIREBASE_SERVICE_ACCOUNT_PATH=/etc/secrets/serviceAccountKey.json
+
+[ ] Secret File: serviceAccountKey.json (paste Firebase service account JSON)
+
+[ ] Root Directory: backend
+[ ] Build: npm install
+[ ] Start: npm start  (or node index.js)
+
+[ ] Database: Run `npm run db:init` once (from backend folder, DATABASE_URL set)
+
+
+MOBILE
+--------------------------------------------------------------------------------
+[ ] mobile/.env — EXPO_PUBLIC_API_URL=https://allconnect.onrender.com
+
+[ ] For EAS/production build: Set EXPO_PUBLIC_API_URL in EAS Secrets
+
+[ ] Firebase Console: Add your app domains if using Expo web
+    (Auth → Settings → Authorized domains)
+
+
+VERIFY
+--------------------------------------------------------------------------------
+[ ] https://allconnect.onrender.com/health → {"ok":true}
+[ ] Sign up, sign in, forgot password work
+[ ] Map loads nearby posts
+[ ] Create post, join request, chat work
+
+================================================================================

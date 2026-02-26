@@ -14,6 +14,9 @@ const chatsRoutes = require('./routes/chats');
 const app = express();
 const server = http.createServer(app);
 
+// Required for correct client IP when behind Render/proxy (rate limiting, etc.)
+app.set('trust proxy', 1);
+
 const corsOrigin = process.env.CORS_ORIGIN && process.env.CORS_ORIGIN.trim() ? process.env.CORS_ORIGIN.trim() : true;
 const io = new Server(server, {
   path: '/socket.io',

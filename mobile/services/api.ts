@@ -13,7 +13,18 @@ async function request<T>(
   };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const res = await fetch(`${API_URL}${path}`, { ...options, headers });
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, { ...options, headers });
+  } catch (e) {
+    const msg =
+      e instanceof Error &&
+      (e.message === 'Failed to fetch' || e.message?.includes('Network request failed'))
+        ? 'Network error. Check your connection and try again.'
+        : (e instanceof Error ? e.message : 'Request failed');
+    throw new Error(msg);
+  }
+
   const text = await res.text();
   let data: unknown = {};
   if (text) {
@@ -36,12 +47,15 @@ async function request<T>(
 
 // ── Auth ───────────────────────────────────────────────
 export const authApi = {
-  // Email auth (Firebase)
-  firebaseLogin: (idToken: string) =>
+  // Email/password auth (Firebase) — mobile optional, required at registration
+  firebaseLogin: (idToken: string, mobile?: string) =>
     request<{ token: string; user: User }>('/api/auth/firebase', {
       method: 'POST',
-      body: JSON.stringify({ idToken }),
+      body: JSON.stringify(mobile ? { idToken, mobile } : { idToken }),
     }),
+  // Get email for login-by-mobile (rate limited)
+  getEmailForLogin: (mobile: string) =>
+    request<{ email: string }>(`/api/auth/email-for-login?mobile=${encodeURIComponent(mobile)}`),
   // OTP auth (kept for future mobile login - not shown in UI for now)
   sendOtp: (mobile: string) =>
     request<{ success: boolean }>('/api/auth/send-otp', {
