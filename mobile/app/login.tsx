@@ -47,7 +47,7 @@ export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const { isDark } = useAppTheme();
   const [mode, setMode] = useState<"signin" | "signup" | "forgot">("signin");
-  const [emailOrMobile, setEmailOrMobile] = useState("");
+  const [email, setEmail] = useState("");
   const [mobile, setMobile] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -61,10 +61,14 @@ export default function LoginScreen() {
   const inputBg = isDark ? "#252528" : "#F5F5F7";
 
   async function handleSignIn() {
-    const input = emailOrMobile.trim();
+    const e = email.trim().toLowerCase();
     const p = password;
-    if (!input || !p) {
-      Alert.alert("Required", "Enter email or mobile and password.");
+    if (!e || !p) {
+      Alert.alert("Required", "Enter email and password.");
+      return;
+    }
+    if (!isEmail(e)) {
+      Alert.alert("Invalid", "Enter a valid email address.");
       return;
     }
     if (p.length < 6) {
@@ -73,20 +77,7 @@ export default function LoginScreen() {
     }
     setLoading(true);
     try {
-      let email = "";
-      if (isEmail(input)) {
-        email = input.toLowerCase();
-      } else {
-        const mob = normalizeMobile(input);
-        if (!mob) {
-          Alert.alert("Invalid", "Enter a valid email or 10-digit mobile number.");
-          setLoading(false);
-          return;
-        }
-        const res = await authApi.getEmailForLogin(mob);
-        email = res.email;
-      }
-      const cred = await signInWithEmail(email, p);
+      const cred = await signInWithEmail(e, p);
       const idToken = await getIdToken(cred.user);
       const { token, user } = await authApi.firebaseLogin(idToken);
       setAuth(token, user);
@@ -94,13 +85,11 @@ export default function LoginScreen() {
     } catch (err: any) {
       const msg = err?.message || "Sign in failed.";
       if (msg.includes("user-not-found") || msg.includes("wrong-password") || msg.includes("404"))
-        Alert.alert("Sign in failed", "Invalid email/mobile or password.");
+        Alert.alert("Sign in failed", "Invalid email or password.");
       else if (msg.includes("Too many attempts"))
         Alert.alert("Try again later", "Too many login attempts. Please wait a few minutes.");
       else if (msg.includes("email-not-verified"))
         Alert.alert("Email not verified", "Check your inbox and verify your email first.");
-      else if (msg.includes("No account found"))
-        Alert.alert("Sign in failed", "No account found for this mobile.");
       else if (msg.includes("Network error"))
         Alert.alert("Connection error", "Check your internet connection and try again.");
       else Alert.alert("Error", msg);
@@ -110,7 +99,7 @@ export default function LoginScreen() {
   }
 
   async function handleSignUp() {
-    const e = emailOrMobile.trim().toLowerCase();
+    const e = email.trim().toLowerCase();
     const m = mobile.trim();
     const p = password;
     if (!e || !m || !p) {
@@ -134,7 +123,7 @@ export default function LoginScreen() {
     try {
       const cred = await signUpWithEmail(e, p);
       const idToken = await getIdToken(cred.user);
-      const { token, user } = await authApi.firebaseLogin(idToken, mob);
+      const { token, user } = await authApi.firebaseLogin(idToken, mob); // mobile linked to email for messaging
       setAuth(token, user);
       Alert.alert(
         "Verify your email",
@@ -158,27 +147,18 @@ export default function LoginScreen() {
   }
 
   async function handleForgotPassword() {
-    const input = emailOrMobile.trim();
-    if (!input) {
-      Alert.alert("Required", "Enter your email or mobile number.");
+    const e = email.trim().toLowerCase();
+    if (!e) {
+      Alert.alert("Required", "Enter your email address.");
+      return;
+    }
+    if (!isEmail(e)) {
+      Alert.alert("Invalid", "Enter a valid email address.");
       return;
     }
     setLoading(true);
     try {
-      let email = "";
-      if (isEmail(input)) {
-        email = input.toLowerCase();
-      } else {
-        const mob = normalizeMobile(input);
-        if (!mob) {
-          Alert.alert("Invalid", "Enter a valid email or 10-digit mobile number.");
-          setLoading(false);
-          return;
-        }
-        const res = await authApi.getEmailForLogin(mob);
-        email = res.email;
-      }
-      await sendPasswordReset(email);
+      await sendPasswordReset(e);
       Alert.alert(
         "Check your email",
         "We sent a password reset link to your email. Check your inbox and spam folder."
@@ -187,7 +167,7 @@ export default function LoginScreen() {
     } catch (err: any) {
       const msg = err?.message || "Could not send reset email.";
       if (msg.includes("user-not-found") || msg.includes("404"))
-        Alert.alert("Not found", "No account found for this email or mobile.");
+        Alert.alert("Not found", "No account found for this email.");
       else if (msg.includes("Too many attempts"))
         Alert.alert("Try again later", "Too many attempts. Please wait a few minutes.");
       else if (msg.includes("Network error"))
@@ -197,18 +177,6 @@ export default function LoginScreen() {
       setLoading(false);
     }
   }
-
-  const getPlaceholder = () => {
-    if (mode === "signup") return "your@email.com";
-    if (mode === "forgot") return "Email or mobile number";
-    return "Email or mobile number";
-  };
-
-  const getKeyboardType = () => {
-    if (mode === "signup" && !emailOrMobile.includes("@")) return "email-address";
-    if (mode === "forgot" || mode === "signin") return "default";
-    return "email-address";
-  };
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
@@ -244,17 +212,15 @@ export default function LoginScreen() {
               <View style={[s.sectionIcon, { backgroundColor: PRIMARY_LIGHT }]}>
                 <Ionicons name="mail-outline" size={18} color={PRIMARY} />
               </View>
-              <Text style={[s.sectionTitle, { color: textColor }]}>
-                {mode === "signup" ? "Email" : "Email or mobile"}
-              </Text>
+              <Text style={[s.sectionTitle, { color: textColor }]}>Email</Text>
             </View>
-            <View style={[s.inputWrapper, { backgroundColor: inputBg, borderColor: (mode === "signup" ? emailOrMobile.includes("@") : emailOrMobile.length > 0) ? PRIMARY : borderColor }]}>
+            <View style={[s.inputWrapper, { backgroundColor: inputBg, borderColor: isEmail(email) ? PRIMARY : borderColor }]}>
               <TextInput
-                value={emailOrMobile}
-                onChangeText={setEmailOrMobile}
-                placeholder={getPlaceholder()}
+                value={email}
+                onChangeText={setEmail}
+                placeholder="your@email.com"
                 placeholderTextColor={isDark ? "#555" : "#C0C0C0"}
-                keyboardType={getKeyboardType()}
+                keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
                 style={[s.input, { color: textColor }]}
@@ -267,7 +233,10 @@ export default function LoginScreen() {
                   <View style={[s.sectionIcon, { backgroundColor: PRIMARY_LIGHT }]}>
                     <Ionicons name="call-outline" size={18} color={PRIMARY} />
                   </View>
-                  <Text style={[s.sectionTitle, { color: textColor }]}>Mobile number</Text>
+                  <View>
+                    <Text style={[s.sectionTitle, { color: textColor }]}>Mobile number</Text>
+                    <Text style={[s.sectionSubtext, { color: subColor }]}>Linked to your email for messaging</Text>
+                  </View>
                 </View>
                 <View style={[s.inputWrapper, { backgroundColor: inputBg, borderColor: normalizeMobile(mobile).length >= 13 ? PRIMARY : borderColor }]}>
                   <TextInput
@@ -454,6 +423,7 @@ const s = StyleSheet.create({
     marginRight: 12,
   },
   sectionTitle: { fontSize: 16, fontWeight: "700" },
+  sectionSubtext: { fontSize: 12, marginTop: 2 },
   inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
