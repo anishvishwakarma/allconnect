@@ -93,4 +93,6 @@ const PORT = process.env.PORT || 4000;
 server.listen(PORT, () => {
   console.log(`AllConnect API + Socket.io listening on http://localhost:${PORT}`);
   if (!process.env.DATABASE_URL) console.warn('DATABASE_URL not set — set it in .env');
+  const { isConfigured } = require('./services/firebase');
+  if (!isConfigured()) console.warn('Firebase not configured — set FIREBASE_SERVICE_ACCOUNT_JSON or FIREBASE_SERVICE_ACCOUNT_PATH. Login will return 503.');
 });

@@ -1,6 +1,6 @@
-/** REST + Socket base URL. Set EXPO_PUBLIC_API_URL in .env (prod: https://allconnect.onrender.com) */
+/** REST + Socket base URL. Set EXPO_PUBLIC_API_URL in .env. Default: production (localhost only works when running backend locally) */
 export const API_URL =
-  (process.env.EXPO_PUBLIC_API_URL as string | undefined) || 'http://localhost:4000';
+  (process.env.EXPO_PUBLIC_API_URL as string | undefined)?.trim() || 'https://allconnect.onrender.com';
 
 export const SOCKET_URL = API_URL;
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -18,6 +18,7 @@ import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAppTheme } from "../context/ThemeContext";
 import { useAlert } from "../context/AlertContext";
+import { API_URL } from "../constants/config";
 import { authApi } from "../services/api";
 import { useAuthStore } from "../store/auth";
 import {
@@ -54,6 +55,15 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingHint, setLoadingHint] = useState("");
+
+    // Pre-wake server (Render cold start) when login screen mounts
+  useEffect(() => {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 8000);
+    fetch(`${API_URL}/health`, { method: "GET", signal: ctrl.signal })
+      .catch(() => {})
+      .finally(() => clearTimeout(t));
+  }, []);
 
   const bg = isDark ? "#0C0C0F" : "#FAFAFA";
   const surface = isDark ? "#1A1A1F" : "#FFFFFF";
@@ -105,6 +115,20 @@ export default function LoginScreen() {
         alert.show("Try again later", "Too many login attempts. Please wait a few minutes.", undefined, "info");
       else if (msg.includes("email-not-verified"))
         alert.show("Email not verified", "Check your inbox and verify your email first.", undefined, "info");
+      else if (msg.includes("Service temporarily unavailable") || msg.includes("Firebase not configured"))
+        alert.show(
+          "Server setup",
+          "The app is being configured. Please try again in a minute or contact support.",
+          undefined,
+          "error"
+        );
+      else if (msg.includes("timed out"))
+        alert.show(
+          "Taking too long",
+          "The server may be starting up. Please try again in a moment.",
+          [{ text: "Cancel", style: "cancel" }, { text: "Retry", onPress: () => handleSignIn() }],
+          "info"
+        );
       else if (isRetryable)
         alert.show(
           "Connection issue",
@@ -174,6 +198,20 @@ export default function LoginScreen() {
         alert.show("Mobile in use", "This mobile number is already registered.", undefined, "error");
       else if (msg.includes("weak-password"))
         alert.show("Weak password", "Use at least 6 characters.", undefined, "info");
+      else if (msg.includes("Service temporarily unavailable") || msg.includes("Firebase not configured"))
+        alert.show(
+          "Server setup",
+          "The app is being configured. Please try again in a minute or contact support.",
+          undefined,
+          "error"
+        );
+      else if (msg.includes("timed out"))
+        alert.show(
+          "Taking too long",
+          "The server may be starting up. Please try again in a moment.",
+          [{ text: "Cancel", style: "cancel" }, { text: "Retry", onPress: () => handleSignUp() }],
+          "info"
+        );
       else if (isRetryable)
         alert.show(
           "Connection issue",

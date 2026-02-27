@@ -5,7 +5,7 @@ const { signToken } = require('../middleware/auth');
 const { sendOtpSms } = require('../services/sms');
 const { rateLimitOtp } = require('../middleware/rateLimitOtp');
 const { rateLimitAuth } = require('../middleware/rateLimitAuth');
-const { verifyIdToken } = require('../services/firebase');
+const { verifyIdToken, isConfigured } = require('../services/firebase');
 
 const router = express.Router();
 const OTP_TTL_MINUTES = 10;
@@ -115,6 +115,9 @@ router.post('/firebase', async (req, res) => {
     const mobile = normalizeMobile(req.body?.mobile);
     if (!idToken) return res.status(400).json({ error: 'idToken required' });
 
+    if (!isConfigured()) {
+      return res.status(503).json({ error: 'Service temporarily unavailable' });
+    }
     const decoded = await verifyIdToken(idToken);
     if (!decoded || !decoded.email) return res.status(401).json({ error: 'Invalid or expired token' });
 

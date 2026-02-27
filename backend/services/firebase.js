@@ -50,4 +50,8 @@ async function verifyIdToken(idToken) {
   }
 }
 
-module.exports = { getAdmin, verifyIdToken };
+function isConfigured() {
+  return getAdmin() !== null;
+}
+
+module.exports = { getAdmin, verifyIdToken, isConfigured };
