@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   Linking,
-  Alert,
   ActivityIndicator,
 } from "react-native";
 import { router } from "expo-router";
@@ -18,6 +17,7 @@ import { useAuthStore } from "../store/auth";
 import { disconnectSocket } from "../services/socket";
 import { usersApi } from "../services/api";
 import Constants from "expo-constants";
+import { useAlert } from "../context/AlertContext";
 
 const PRIMARY = "#E8751A";
 const APP_VERSION = Constants.expoConfig?.version ?? "1.0.0";
@@ -25,6 +25,7 @@ const APP_VERSION = Constants.expoConfig?.version ?? "1.0.0";
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { isDark } = useAppTheme();
+  const alert = useAlert();
   const theme = useThemeStore((s) => s.theme);
   const setTheme = useThemeStore((s) => s.setTheme);
   const logout = useAuthStore((s) => s.logout);
@@ -40,12 +41,12 @@ export default function SettingsScreen() {
   function openUrl(url: string, label: string) {
     Linking.canOpenURL(url).then((ok) => {
       if (ok) Linking.openURL(url);
-      else Alert.alert("Link", `${label} will be available soon.`);
-    }).catch(() => Alert.alert("Link", `${label} will be available soon.`));
+      else alert.show("Link", `${label} will be available soon.`, undefined, "info");
+    }).catch(() => alert.show("Link", `${label} will be available soon.`, undefined, "info"));
   }
 
   function handleSignOut() {
-    Alert.alert(
+    alert.show(
       "Sign out",
       "Are you sure you want to sign out?",
       [
@@ -55,12 +56,13 @@ export default function SettingsScreen() {
           logout();
           router.replace("/login");
         } },
-      ]
+      ],
+      "info"
     );
   }
 
   function handleDeleteAccount() {
-    Alert.alert(
+    alert.show(
       "Delete account",
       "Your account and all your data (profile, posts, chats) will be permanently deleted. This cannot be undone.",
       [
@@ -69,7 +71,7 @@ export default function SettingsScreen() {
           text: "Delete",
           style: "destructive",
           onPress: () => {
-            Alert.alert(
+            alert.show(
               "Confirm deletion",
               "Type DELETE to confirm permanent account deletion.",
               [
@@ -79,11 +81,13 @@ export default function SettingsScreen() {
                   style: "destructive",
                   onPress: confirmDeleteAccount,
                 },
-              ]
+              ],
+              "error"
             );
           },
         },
-      ]
+      ],
+      "error"
     );
   }
 
@@ -95,9 +99,9 @@ export default function SettingsScreen() {
       disconnectSocket();
       logout();
       router.replace("/login");
-      Alert.alert("Account deleted", "Your account and data have been permanently deleted.");
+      alert.show("Account deleted", "Your account and data have been permanently deleted.", undefined, "success");
     } catch (err: any) {
-      Alert.alert("Error", err?.message || "Could not delete account. Try again or contact support.");
+      alert.show("Something went wrong", "Could not delete account. Try again or contact support.", undefined, "error");
     } finally {
       setDeleting(false);
     }

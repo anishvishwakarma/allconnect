@@ -3,6 +3,7 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import Constants from "expo-constants";
 import { ThemeProvider, useAppTheme } from "../context/ThemeContext";
+import { AlertProvider } from "../context/AlertContext";
 import { useAuthStore } from "../store/auth";
 
 function RootStack() {
@@ -33,7 +34,9 @@ function RootStack() {
 export default function RootLayout() {
   return (
     <ThemeProvider>
-      <RootStack />
+      <AlertProvider>
+        <RootStack />
+      </AlertProvider>
     </ThemeProvider>
   );
 }

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, ActivityIndicator,
-  Alert, StyleSheet,
+  StyleSheet,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -9,6 +9,7 @@ import { postsApi, requestsApi, chatsApi } from "../../services/api";
 import { useAuthStore } from "../../store/auth";
 import { CATEGORY_COLORS } from "../../constants/config";
 import { useAppTheme } from "../../context/ThemeContext";
+import { useAlert } from "../../context/AlertContext";
 
 const PRIMARY = "#E8751A";
 
@@ -18,6 +19,7 @@ export default function PostDetailScreen() {
   const token = useAuthStore((s) => s.token);
   const user = useAuthStore((s) => s.user);
   const { isDark } = useAppTheme();
+  const alert = useAlert();
 
   const [post, setPost] = useState<any>(null);
   const [requests, setRequests] = useState<any[]>([]);
@@ -62,7 +64,7 @@ export default function PostDetailScreen() {
           }
         }
       }
-    } catch (err: any) { Alert.alert("Error", err.message || "Post not found"); }
+    } catch (err: any) { alert.show("Something went wrong", "Could not load this post. Please try again.", undefined, "error"); }
     finally { setLoading(false); }
   }
 
@@ -72,8 +74,8 @@ export default function PostDetailScreen() {
       await requestsApi.send(id);
       const myReq = await requestsApi.myRequest(id);
       setMyRequest(myReq ?? null);
-      Alert.alert("Request sent!", "The host will review your request soon.");
-    } catch (err: any) { Alert.alert("Error", err.message || "Request failed"); }
+      alert.show("Request sent", "The host will review your request soon.", undefined, "success");
+    } catch (err: any) { alert.show("Something went wrong", "Could not send your request. Please try again.", undefined, "error"); }
     finally { setActionId(null); }
   }
 
@@ -84,7 +86,7 @@ export default function PostDetailScreen() {
       else await requestsApi.reject(id, reqUserId);
       setRequests((prev) => prev.map((r) => (r.user_id === reqUserId ? { ...r, status: action === "approve" ? "approved" : "rejected" } : r)));
       if (action === "approve") await load();
-    } catch (err: any) { Alert.alert("Error", err.message || "Failed"); }
+    } catch (err: any) { alert.show("Something went wrong", "Action failed. Please try again.", undefined, "error"); }
     finally { setActionId(null); }
   }
 

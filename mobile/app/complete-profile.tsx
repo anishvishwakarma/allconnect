@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  Alert,
   ActivityIndicator,
   Image,
 } from "react-native";
@@ -17,12 +16,14 @@ import { useAuthStore } from "../store/auth";
 import { usersApi } from "../services/api";
 import { getInitials } from "../utils/profile";
 import { useAppTheme } from "../context/ThemeContext";
+import { useAlert } from "../context/AlertContext";
 
 const PRIMARY = "#E8751A";
 
 export default function CompleteProfileScreen() {
   const { token, user, updateUser } = useAuthStore();
   const { isDark } = useAppTheme();
+  const alert = useAlert();
   const [name, setName] = useState(user?.name?.trim() || "");
   const [email, setEmail] = useState(user?.email?.trim() || "");
   const [avatarUri, setAvatarUri] = useState<string | null>(user?.avatar_uri || null);
@@ -43,7 +44,7 @@ export default function CompleteProfileScreen() {
   async function pickImage() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert("Permission needed", "Allow access to your photos to add a profile picture.");
+      alert.show("Permission needed", "Allow access to your photos to add a profile picture.", undefined, "info");
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -63,7 +64,7 @@ export default function CompleteProfileScreen() {
   async function save() {
     const trimmedName = name.trim();
     if (!trimmedName) {
-      Alert.alert("Required", "Please enter your name.");
+      alert.show("Required", "Please enter your name.", undefined, "info");
       return;
     }
     setSaving(true);
@@ -84,7 +85,7 @@ export default function CompleteProfileScreen() {
       });
       router.replace("/(tabs)/map");
     } catch (err: any) {
-      Alert.alert("Error", err?.message || "Could not save. Try again.");
+      alert.show("Something went wrong", "Could not save. Please try again.", undefined, "error");
     } finally {
       setSaving(false);
     }

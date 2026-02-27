@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  Alert,
   ActivityIndicator,
   Image,
 } from "react-native";
@@ -17,6 +16,7 @@ import { useAuthStore } from "../../store/auth";
 import { usersApi } from "../../services/api";
 import { getInitials } from "../../utils/profile";
 import { useAppTheme } from "../../context/ThemeContext";
+import { useAlert } from "../../context/AlertContext";
 
 const PRIMARY = "#E8751A";
 
@@ -30,6 +30,7 @@ export default function EditProfileScreen() {
   const [avatarBase64, setAvatarBase64] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const { isDark } = useAppTheme();
+  const alert = useAlert();
 
   const bg = isDark ? "#0C0C0F" : "#F5F5F7";
   const surface = isDark ? "#1A1A1F" : "#FFFFFF";
@@ -55,7 +56,7 @@ export default function EditProfileScreen() {
   async function pickImage() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert("Permission needed", "Allow access to your photos to add a profile picture.");
+      alert.show("Permission needed", "Allow access to your photos to add a profile picture.", undefined, "info");
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -87,10 +88,10 @@ export default function EditProfileScreen() {
         avatar_uri: avatarUrl ?? undefined,
       });
       updateUser({ ...u, avatar_uri: avatarUrl ?? (u as { avatar_uri?: string })?.avatar_uri });
-      Alert.alert("Saved", "Profile updated.");
+      alert.show("Saved", "Profile updated.", undefined, "success");
       router.back();
     } catch (err: any) {
-      Alert.alert("Error", err?.message || "Could not save. Try again.");
+      alert.show("Something went wrong", "Could not save. Please try again.", undefined, "error");
       router.back();
     } finally {
       setSaving(false);

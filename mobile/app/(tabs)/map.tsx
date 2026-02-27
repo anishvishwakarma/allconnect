@@ -12,6 +12,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuthStore } from "../../store/auth";
 import { postsApi, requestsApi } from "../../services/api";
 import { useAppTheme } from "../../context/ThemeContext";
+import { useAlert } from "../../context/AlertContext";
 
 const PRIMARY = "#E8751A";
 const { height: SCREEN_H } = Dimensions.get("window");
@@ -39,6 +40,7 @@ export default function MapScreen() {
   const token = useAuthStore((s) => s.token);
   const user = useAuthStore((s) => s.user);
   const { isDark } = useAppTheme();
+  const alert = useAlert();
   const [region, setRegion] = useState({ latitude: 28.6139, longitude: 77.209, latitudeDelta: 0.05, longitudeDelta: 0.05 });
   const [pins, setPins] = useState<any[]>([]);
   const [selectedPin, setSelectedPin] = useState<any>(null);
@@ -96,7 +98,7 @@ export default function MapScreen() {
       await requestsApi.send(selectedPin.id);
       setReqDone(true);
     } catch (err: any) {
-      alert(err.message || "Request failed");
+      alert.show("Something went wrong", "Could not send your request. Please try again.", undefined, "error");
     } finally { setReqLoading(false); }
   }
 

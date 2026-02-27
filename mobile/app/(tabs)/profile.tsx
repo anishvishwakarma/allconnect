@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   View, Text, TextInput, TouchableOpacity, ActivityIndicator,
-  Alert, ScrollView, StyleSheet, Image,
+  ScrollView, StyleSheet, Image,
 } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -10,12 +10,14 @@ import { useAuthStore } from "../../store/auth";
 import { disconnectSocket } from "../../services/socket";
 import { getInitials } from "../../utils/profile";
 import { useAppTheme } from "../../context/ThemeContext";
+import { useAlert } from "../../context/AlertContext";
 
 const PRIMARY = "#E8751A";
 
 export default function ProfileScreen() {
   const { token, user, updateUser, logout } = useAuthStore();
   const { isDark } = useAppTheme();
+  const alert = useAlert();
   const [name, setName] = useState(user?.name || "");
   const [email, setEmail] = useState(user?.email || "");
   const [editing, setEditing] = useState(false);
@@ -51,16 +53,16 @@ export default function ProfileScreen() {
     setSaving(true);
     try {
       const u = await usersApi.update({ name: name.trim() || undefined, email: email.trim() || undefined });
-      updateUser(u); setEditing(false); Alert.alert("Saved!", "Profile updated.");
-    } catch (err: any) { Alert.alert("Error", err.message || "Failed"); }
+      updateUser(u); setEditing(false); alert.show("Saved", "Profile updated.", undefined, "success");
+    } catch (err: any) { alert.show("Something went wrong", "Could not save. Please try again.", undefined, "error"); }
     finally { setSaving(false); }
   }
 
   function confirmLogout() {
-    Alert.alert("Sign Out", "Are you sure?", [
+    alert.show("Sign out", "Are you sure you want to sign out?", [
       { text: "Cancel", style: "cancel" },
-      { text: "Sign Out", style: "destructive", onPress: () => { disconnectSocket(); logout(); router.replace("/login"); } },
-    ]);
+      { text: "Sign out", style: "destructive", onPress: () => { disconnectSocket(); logout(); router.replace("/login"); } },
+    ], "info");
   }
 
   const subEnd = user?.subscription_ends_at;
@@ -194,7 +196,7 @@ export default function ProfileScreen() {
             <>
               <View style={[s.separator, { backgroundColor: border }]} />
               <TouchableOpacity
-                onPress={() => Alert.alert("Coming soon", "Pro upgrade will be available soon. You can still create up to 5 free posts per month.")}
+                onPress={() => alert.show("Coming soon", "Pro upgrade will be available soon. You can still create up to 5 free posts per month.", undefined, "info")}
                 style={[s.upgradeBtn, { backgroundColor: PRIMARY + "12" }]}
               >
                 <Ionicons name="rocket-outline" size={16} color={PRIMARY} />

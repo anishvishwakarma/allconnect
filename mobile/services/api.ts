@@ -45,14 +45,42 @@ async function request<T>(
   return data as T;
 }
 
+// Auth with retry for cold start (Render free tier sleeps after inactivity)
+const AUTH_RETRY_DELAY_MS = 2500;
+const AUTH_MAX_RETRIES = 2;
+
+async function authRequestWithRetry<T>(
+  fn: () => Promise<T>,
+  retries = AUTH_MAX_RETRIES
+): Promise<T> {
+  for (let i = 0; i <= retries; i++) {
+    try {
+      return await fn();
+    } catch (e: any) {
+      const isLast = i === retries;
+      const isRetryable =
+        e?.message?.includes('Network') ||
+        e?.message?.includes('Failed to fetch') ||
+        e?.message?.includes('token') ||
+        e?.message?.includes('Verification') ||
+        e?.message?.includes('Request failed');
+      if (!isRetryable || isLast) throw e;
+      await new Promise((r) => setTimeout(r, AUTH_RETRY_DELAY_MS));
+    }
+  }
+  throw new Error('Request failed');
+}
+
 // ── Auth ───────────────────────────────────────────────
 export const authApi = {
   // Email/password auth (Firebase) — mobile optional, required at registration
   firebaseLogin: (idToken: string, mobile?: string) =>
-    request<{ token: string; user: User }>('/api/auth/firebase', {
-      method: 'POST',
-      body: JSON.stringify(mobile ? { idToken, mobile } : { idToken }),
-    }),
+    authRequestWithRetry(() =>
+      request<{ token: string; user: User }>('/api/auth/firebase', {
+        method: 'POST',
+        body: JSON.stringify(mobile ? { idToken, mobile } : { idToken }),
+      })
+    ),
   // Get email for login-by-mobile (rate limited)
   getEmailForLogin: (mobile: string) =>
     request<{ email: string }>(`/api/auth/email-for-login?mobile=${encodeURIComponent(mobile)}`),

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import {
   View, Text, FlatList, TextInput, TouchableOpacity,
-  KeyboardAvoidingView, Platform, ActivityIndicator, Alert,
+  KeyboardAvoidingView, Platform, ActivityIndicator,
   StyleSheet,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
@@ -10,6 +10,7 @@ import { chatsApi } from "../../services/api";
 import { getSocket, joinChatRoom, leaveChatRoom, emitTyping, emitStopTyping } from "../../services/socket";
 import { useAuthStore } from "../../store/auth";
 import { useAppTheme } from "../../context/ThemeContext";
+import { useAlert } from "../../context/AlertContext";
 
 const PRIMARY = "#E8751A";
 
@@ -19,6 +20,7 @@ export default function ChatScreen() {
   const user = useAuthStore((s) => s.user);
   const token = useAuthStore((s) => s.token);
   const { isDark } = useAppTheme();
+  const alert = useAlert();
   const [messages, setMessages] = useState<any[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(true);
@@ -51,7 +53,7 @@ export default function ChatScreen() {
     socket.on("chat:stop_typing", () => setTyping(false));
     socket.on("chat:expired", () => {
       setExpired(true);
-      Alert.alert("Chat Ended", "This event has ended and the group has been closed.");
+      alert.show("Chat ended", "This event has ended and the group has been closed.", undefined, "info");
     });
 
     return () => {

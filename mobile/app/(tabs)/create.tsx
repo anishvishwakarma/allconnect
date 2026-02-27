@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   View, Text, TextInput, ScrollView, TouchableOpacity,
-  ActivityIndicator, KeyboardAvoidingView, Platform, Alert,
+  ActivityIndicator, KeyboardAvoidingView, Platform,
   Switch, StyleSheet,
 } from "react-native";
 import * as Location from "expo-location";
@@ -11,6 +11,7 @@ import { postsApi } from "../../services/api";
 import { useAuthStore } from "../../store/auth";
 import { POST_CATEGORIES } from "../../types";
 import { useAppTheme } from "../../context/ThemeContext";
+import { useAlert } from "../../context/AlertContext";
 
 const PRIMARY = "#E8751A";
 const CAT_COLORS: Record<string, string> = {
@@ -23,6 +24,7 @@ export default function CreatePostScreen() {
   const token = useAuthStore((s) => s.token);
   const user = useAuthStore((s) => s.user);
   const { isDark } = useAppTheme();
+  const alert = useAlert();
 
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("");
@@ -67,26 +69,26 @@ export default function CreatePostScreen() {
     setFetchingLoc(true);
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") { Alert.alert("Permission denied", "Location permission is required."); return; }
+      if (status !== "granted") { alert.show("Permission denied", "Location permission is required.", undefined, "info"); return; }
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
       setLat(loc.coords.latitude);
       setLng(loc.coords.longitude);
       const [geo] = await Location.reverseGeocodeAsync({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
       if (geo) setAddressText([geo.street, geo.district, geo.city].filter(Boolean).join(", "));
-    } catch { Alert.alert("Error", "Could not get location"); }
+    } catch { alert.show("Something went wrong", "Could not get location. Please try again.", undefined, "error"); }
     finally { setFetchingLoc(false); }
   }
 
   async function submit() {
-    if (!title.trim()) { Alert.alert("Required", "Add a title"); return; }
-    if (!category) { Alert.alert("Required", "Select a category"); return; }
-    if (lat == null || lng == null) { Alert.alert("Required", "Set your location"); return; }
-    if (!eventAt) { Alert.alert("Required", "Set the event date and time"); return; }
+    if (!title.trim()) { alert.show("Required", "Add a title.", undefined, "info"); return; }
+    if (!category) { alert.show("Required", "Select a category.", undefined, "info"); return; }
+    if (lat == null || lng == null) { alert.show("Required", "Set your location.", undefined, "info"); return; }
+    if (!eventAt) { alert.show("Required", "Set the event date and time.", undefined, "info"); return; }
     const eventDate = new Date(eventAt);
-    if (isNaN(eventDate.getTime())) { Alert.alert("Invalid", "Use format: 2026-03-15T20:00"); return; }
-    if (eventDate < new Date()) { Alert.alert("Invalid", "Event must be in the future"); return; }
+    if (isNaN(eventDate.getTime())) { alert.show("Invalid", "Use format: 2026-03-15T20:00", undefined, "info"); return; }
+    if (eventDate < new Date()) { alert.show("Invalid", "Event must be in the future.", undefined, "info"); return; }
     if (!hasSubscription && freeRemaining <= 0) {
-      Alert.alert("Limit reached", "You've used your 5 free posts this month. Upgrade to Pro for unlimited posts.");
+      alert.show("Limit reached", "You've used your 5 free posts this month. Upgrade to Pro for unlimited posts.", undefined, "info");
       return;
     }
     setLoading(true);
@@ -104,12 +106,12 @@ export default function CreatePostScreen() {
         max_people: Number(maxParticipants),
         privacy_type: approvalRequired ? "public" : "public",
       });
-      Alert.alert("🎉 Posted!", "Your post is live on the map.", [
+      alert.show("Posted!", "Your post is live on the map.", [
         { text: "View Post", onPress: () => router.push(`/post/${post.id}`) },
         { text: "Explore Map", onPress: () => router.replace("/(tabs)/map") },
-      ]);
+      ], "success");
     } catch (err: any) {
-      Alert.alert("Error", err.message || "Failed to create post");
+      alert.show("Something went wrong", "Could not create post. Please try again.", undefined, "error");
     } finally { setLoading(false); }
   }
 

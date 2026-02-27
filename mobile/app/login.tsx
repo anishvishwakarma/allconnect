@@ -7,7 +7,6 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   StyleSheet,
   Image,
   ScrollView,
@@ -18,6 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAppTheme } from "../context/ThemeContext";
+import { useAlert } from "../context/AlertContext";
 import { authApi } from "../services/api";
 import { useAuthStore } from "../store/auth";
 import {
@@ -46,12 +46,14 @@ export default function LoginScreen() {
   const setAuth = useAuthStore((s) => s.setAuth);
   const insets = useSafeAreaInsets();
   const { isDark } = useAppTheme();
+  const alert = useAlert();
   const [mode, setMode] = useState<"signin" | "signup" | "forgot">("signin");
   const [email, setEmail] = useState("");
   const [mobile, setMobile] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadingHint, setLoadingHint] = useState("");
 
   const bg = isDark ? "#0C0C0F" : "#FAFAFA";
   const surface = isDark ? "#1A1A1F" : "#FFFFFF";
@@ -64,37 +66,57 @@ export default function LoginScreen() {
     const e = email.trim().toLowerCase();
     const p = password;
     if (!e || !p) {
-      Alert.alert("Required", "Enter email and password.");
+      alert.show("Required", "Please enter your email and password.", undefined, "info");
       return;
     }
     if (!isEmail(e)) {
-      Alert.alert("Invalid", "Enter a valid email address.");
+      alert.show("Invalid email", "Please enter a valid email address.", undefined, "info");
       return;
     }
     if (p.length < 6) {
-      Alert.alert("Invalid", "Password must be at least 6 characters.");
+      alert.show("Invalid password", "Password must be at least 6 characters.", undefined, "info");
       return;
     }
     setLoading(true);
+    setLoadingHint("");
+    const hintTimer = setTimeout(() => setLoadingHint("Taking longer? Server may be waking up…"), 4000);
     try {
       const cred = await signInWithEmail(e, p);
+      setLoadingHint("Almost there…");
       const idToken = await getIdToken(cred.user);
       const { token, user } = await authApi.firebaseLogin(idToken);
       setAuth(token, user);
       router.replace(user.name?.trim() ? "/(tabs)/map" : "/complete-profile");
     } catch (err: any) {
       const msg = err?.message || "Sign in failed.";
-      if (msg.includes("user-not-found") || msg.includes("wrong-password") || msg.includes("404"))
-        Alert.alert("Sign in failed", "Invalid email or password.");
+      const isRetryable =
+        msg.includes("Network") ||
+        msg.includes("token") ||
+        msg.includes("Verification") ||
+        msg.includes("Request failed");
+      if (
+        msg.includes("user-not-found") ||
+        msg.includes("wrong-password") ||
+        msg.includes("invalid-credential") ||
+        msg.includes("404")
+      )
+        alert.show("Sign in failed", "Invalid email or password.", undefined, "error");
       else if (msg.includes("Too many attempts"))
-        Alert.alert("Try again later", "Too many login attempts. Please wait a few minutes.");
+        alert.show("Try again later", "Too many login attempts. Please wait a few minutes.", undefined, "info");
       else if (msg.includes("email-not-verified"))
-        Alert.alert("Email not verified", "Check your inbox and verify your email first.");
-      else if (msg.includes("Network error"))
-        Alert.alert("Connection error", "Check your internet connection and try again.");
-      else Alert.alert("Error", msg);
+        alert.show("Email not verified", "Check your inbox and verify your email first.", undefined, "info");
+      else if (isRetryable)
+        alert.show(
+          "Connection issue",
+          "The server may be starting up. Please try again.",
+          [{ text: "Cancel", style: "cancel" }, { text: "Retry", onPress: () => handleSignIn() }],
+          "info"
+        );
+      else alert.show("Sign in failed", "Something went wrong. Please try again.", undefined, "error");
     } finally {
+      clearTimeout(hintTimer);
       setLoading(false);
+      setLoadingHint("");
     }
   }
 
@@ -103,86 +125,106 @@ export default function LoginScreen() {
     const m = mobile.trim();
     const p = password;
     if (!e || !m || !p) {
-      Alert.alert("Required", "Enter email, mobile number and password.");
+      alert.show("Required", "Please enter your email, mobile number and password.", undefined, "info");
       return;
     }
     if (!isEmail(e)) {
-      Alert.alert("Invalid", "Enter a valid email address.");
+      alert.show("Invalid email", "Please enter a valid email address.", undefined, "info");
       return;
     }
     const mob = normalizeMobile(m);
     if (!mob) {
-      Alert.alert("Invalid", "Enter a valid 10-digit mobile number.");
+      alert.show("Invalid mobile", "Please enter a valid 10-digit mobile number.", undefined, "info");
       return;
     }
     if (p.length < 6) {
-      Alert.alert("Invalid", "Password must be at least 6 characters.");
+      alert.show("Invalid password", "Password must be at least 6 characters.", undefined, "info");
       return;
     }
     setLoading(true);
+    setLoadingHint("");
+    const hintTimer = setTimeout(() => setLoadingHint("Taking longer? Server may be waking up…"), 4000);
     try {
       const cred = await signUpWithEmail(e, p);
+      setLoadingHint("Almost there…");
       const idToken = await getIdToken(cred.user);
       const { token, user } = await authApi.firebaseLogin(idToken, mob); // mobile linked to email for messaging
       setAuth(token, user);
-      Alert.alert(
-        "Account created!",
+      alert.show(
+        "Account created",
         "We sent a verification link to your email. You can continue now and verify later.",
-        [{ text: "Continue", onPress: () => router.replace(user.name?.trim() ? "/(tabs)/map" : "/complete-profile") }]
+        [{ text: "Continue", onPress: () => router.replace(user.name?.trim() ? "/(tabs)/map" : "/complete-profile") }],
+        "success"
       );
     } catch (err: any) {
       const msg = err?.message || "Sign up failed.";
+      const isRetryable =
+        msg.includes("Network") ||
+        msg.includes("token") ||
+        msg.includes("Verification") ||
+        msg.includes("Request failed");
       if (msg.includes("email-already-in-use"))
-        Alert.alert(
+        alert.show(
           "Already registered",
           "An account with this email already exists. Sign in to continue.",
-          [{ text: "Sign in", onPress: () => setMode("signin") }]
+          [{ text: "Sign in", onPress: () => setMode("signin") }],
+          "info"
         );
       else if (msg.includes("Mobile number already"))
-        Alert.alert("Mobile in use", "This mobile number is already registered.");
+        alert.show("Mobile in use", "This mobile number is already registered.", undefined, "error");
       else if (msg.includes("weak-password"))
-        Alert.alert("Weak password", "Use at least 6 characters.");
-      else if (msg.includes("Network error"))
-        Alert.alert("Connection error", "Check your internet connection and try again.");
+        alert.show("Weak password", "Use at least 6 characters.", undefined, "info");
+      else if (isRetryable)
+        alert.show(
+          "Connection issue",
+          "The server may be starting up. Please try again.",
+          [{ text: "Cancel", style: "cancel" }, { text: "Retry", onPress: () => handleSignUp() }],
+          "info"
+        );
       else if (msg.includes("Invalid") || msg.includes("token") || msg.includes("Verification"))
-        Alert.alert(
+        alert.show(
           "Registration issue",
           "Your account may have been created. Try signing in with your email and password.",
-          [{ text: "Sign in", onPress: () => setMode("signin") }]
+          [{ text: "Sign in", onPress: () => setMode("signin") }],
+          "info"
         );
-      else Alert.alert("Error", msg);
+      else alert.show("Something went wrong", "Please try again or contact support.", undefined, "error");
     } finally {
+      clearTimeout(hintTimer);
       setLoading(false);
+      setLoadingHint("");
     }
   }
 
   async function handleForgotPassword() {
     const e = email.trim().toLowerCase();
     if (!e) {
-      Alert.alert("Required", "Enter your email address.");
+      alert.show("Required", "Please enter your email address.", undefined, "info");
       return;
     }
     if (!isEmail(e)) {
-      Alert.alert("Invalid", "Enter a valid email address.");
+      alert.show("Invalid email", "Please enter a valid email address.", undefined, "info");
       return;
     }
     setLoading(true);
     try {
       await sendPasswordReset(e);
-      Alert.alert(
+      alert.show(
         "Check your email",
-        "We sent a password reset link to your email. Check your inbox and spam folder."
+        "We sent a password reset link to your email. Check your inbox and spam folder.",
+        undefined,
+        "success"
       );
       setMode("signin");
     } catch (err: any) {
       const msg = err?.message || "Could not send reset email.";
       if (msg.includes("user-not-found") || msg.includes("404"))
-        Alert.alert("Not found", "No account found for this email.");
+        alert.show("Not found", "No account found for this email.", undefined, "error");
       else if (msg.includes("Too many attempts"))
-        Alert.alert("Try again later", "Too many attempts. Please wait a few minutes.");
+        alert.show("Try again later", "Too many attempts. Please wait a few minutes.", undefined, "info");
       else if (msg.includes("Network error"))
-        Alert.alert("Connection error", "Check your internet connection and try again.");
-      else Alert.alert("Error", msg);
+        alert.show("Connection error", "Check your internet connection and try again.", undefined, "error");
+      else alert.show("Something went wrong", "Could not send reset email. Please try again.", undefined, "error");
     } finally {
       setLoading(false);
     }
@@ -316,37 +358,53 @@ export default function LoginScreen() {
                 )}
               </TouchableOpacity>
             ) : mode === "signup" ? (
-              <TouchableOpacity
-                onPress={handleSignUp}
-                disabled={loading}
-                style={s.primaryButton}
-                activeOpacity={0.85}
-              >
-                {loading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <>
-                    <Text style={s.primaryButtonText}>Create account</Text>
-                    <Ionicons name="arrow-forward" size={18} color="#fff" style={{ marginLeft: 8 }} />
-                  </>
-                )}
-              </TouchableOpacity>
+              <View>
+                <TouchableOpacity
+                  onPress={handleSignUp}
+                  disabled={loading}
+                  style={s.primaryButton}
+                  activeOpacity={0.85}
+                >
+                  {loading ? (
+                    <>
+                      <ActivityIndicator color="#fff" size="small" />
+                      <Text style={[s.primaryButtonText, { marginLeft: 10 }]}>Creating account…</Text>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={s.primaryButtonText}>Create account</Text>
+                      <Ionicons name="arrow-forward" size={18} color="#fff" style={{ marginLeft: 8 }} />
+                    </>
+                  )}
+                </TouchableOpacity>
+                {loadingHint ? (
+                  <Text style={[s.loadingHint, { color: subColor }]}>{loadingHint}</Text>
+                ) : null}
+              </View>
             ) : (
-              <TouchableOpacity
-                onPress={handleSignIn}
-                disabled={loading}
-                style={s.primaryButton}
-                activeOpacity={0.85}
-              >
-                {loading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <>
-                    <Text style={s.primaryButtonText}>Sign in</Text>
-                    <Ionicons name="arrow-forward" size={18} color="#fff" style={{ marginLeft: 8 }} />
-                  </>
-                )}
-              </TouchableOpacity>
+              <View>
+                <TouchableOpacity
+                  onPress={handleSignIn}
+                  disabled={loading}
+                  style={s.primaryButton}
+                  activeOpacity={0.85}
+                >
+                  {loading ? (
+                    <>
+                      <ActivityIndicator color="#fff" size="small" />
+                      <Text style={[s.primaryButtonText, { marginLeft: 10 }]}>Signing in…</Text>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={s.primaryButtonText}>Sign in</Text>
+                      <Ionicons name="arrow-forward" size={18} color="#fff" style={{ marginLeft: 8 }} />
+                    </>
+                  )}
+                </TouchableOpacity>
+                {loadingHint ? (
+                  <Text style={[s.loadingHint, { color: subColor }]}>{loadingHint}</Text>
+                ) : null}
+              </View>
             )}
 
             <View style={s.switchMode}>
@@ -461,6 +519,7 @@ const s = StyleSheet.create({
     elevation: 4,
   },
   primaryButtonText: { color: "#fff", fontSize: 17, fontWeight: "700" },
+  loadingHint: { fontSize: 12, marginTop: 10, textAlign: "center" },
   switchMode: {
     flexDirection: "row",
     flexWrap: "wrap",
