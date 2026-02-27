@@ -7,14 +7,17 @@
     "start": "node index.js",
     "dev": "node scripts/dev.js",
     "db:init": "node scripts/init-db.js",
-    "db:init:psql": "psql $DATABASE_URL -f schema.sql"
+    "db:init:psql": "psql $DATABASE_URL -f schema.sql",
+    "bucket:create": "node scripts/create-avatars-bucket.js"
   },
   "engines": {
     "node": ">=18"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.98.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
+    "expo-server-sdk": "^6.0.0",
     "express": "^4.21.0",
     "firebase-admin": "^13.6.1",
     "jsonwebtoken": "^9.0.2",

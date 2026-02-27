@@ -5,6 +5,8 @@ const http = require('http');
 const { Server } = require('socket.io');
 const { verifyToken } = require('./middleware/auth');
 
+const db = require('./db');
+const { sendPushToUsers } = require('./services/notifications');
 const authRoutes = require('./routes/auth');
 const usersRoutes = require('./routes/users');
 const postsRoutes = require('./routes/posts');
@@ -67,8 +69,24 @@ io.on('connection', (socket) => {
   });
 });
 
-app.on('chat:new_message', ({ groupId, message }) => {
+app.on('chat:new_message', async ({ groupId, message }) => {
   io.to(`chat:${groupId}`).emit('new_message', message);
+  const senderId = message?.user_id;
+  if (senderId) {
+    const members = await db.rows(
+      'SELECT user_id FROM group_chat_members WHERE group_chat_id = $1 AND user_id != $2',
+      [groupId, senderId]
+    );
+    const userIds = (members || []).map((m) => m.user_id);
+    if (userIds.length) {
+      const body = (message.body || '').slice(0, 80);
+      sendPushToUsers(userIds, {
+        title: 'New message',
+        body: body ? `${body}${body.length >= 80 ? '…' : ''}` : 'You have a new message',
+        data: { type: 'chat_message', groupId },
+      }).catch((e) => console.error('Push on new_message:', e));
+    }
+  }
 });
 
 const PORT = process.env.PORT || 4000;

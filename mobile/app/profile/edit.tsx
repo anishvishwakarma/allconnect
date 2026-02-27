@@ -27,6 +27,7 @@ export default function EditProfileScreen() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
+  const [avatarBase64, setAvatarBase64] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const { isDark } = useAppTheme();
 
@@ -62,9 +63,12 @@ export default function EditProfileScreen() {
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.8,
+      base64: true,
     });
-    if (!result.canceled && result.assets[0]?.uri) {
-      setAvatarUri(result.assets[0].uri);
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      setAvatarUri(asset.uri);
+      setAvatarBase64(asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : null);
     }
   }
 
@@ -72,20 +76,21 @@ export default function EditProfileScreen() {
     if (!token) return;
     setSaving(true);
     try {
+      let avatarUrl = user?.avatar_uri || null;
+      if (avatarBase64) {
+        const res = await usersApi.uploadAvatar(avatarBase64);
+        avatarUrl = res.avatar_uri;
+      }
       const u = await usersApi.update({
         name: name.trim() || undefined,
         email: email.trim() || undefined,
+        avatar_uri: avatarUrl ?? undefined,
       });
-      updateUser({ ...u, avatar_uri: avatarUri ?? (u as { avatar_uri?: string })?.avatar_uri });
+      updateUser({ ...u, avatar_uri: avatarUrl ?? (u as { avatar_uri?: string })?.avatar_uri });
       Alert.alert("Saved", "Profile updated.");
       router.back();
     } catch (err: any) {
-      updateUser({
-        name: name.trim() || undefined,
-        email: email.trim() || undefined,
-        avatar_uri: avatarUri || undefined,
-      });
-      Alert.alert("Saved", "Profile updated (saved locally).");
+      Alert.alert("Error", err?.message || "Could not save. Try again.");
       router.back();
     } finally {
       setSaving(false);

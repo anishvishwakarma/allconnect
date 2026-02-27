@@ -95,3 +95,14 @@ CREATE TABLE IF NOT EXISTS post_participations (
   PRIMARY KEY (post_id, user_id)
 );
 CREATE INDEX IF NOT EXISTS idx_post_participations_user ON post_participations(user_id);
+
+-- Push notification device tokens (Expo)
+CREATE TABLE IF NOT EXISTS device_tokens (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token TEXT NOT NULL,
+  platform TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, token)
+);
+CREATE INDEX IF NOT EXISTS idx_device_tokens_user ON device_tokens(user_id);

@@ -26,6 +26,7 @@ export default function CompleteProfileScreen() {
   const [name, setName] = useState(user?.name?.trim() || "");
   const [email, setEmail] = useState(user?.email?.trim() || "");
   const [avatarUri, setAvatarUri] = useState<string | null>(user?.avatar_uri || null);
+  const [avatarBase64, setAvatarBase64] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   if (!token) {
@@ -50,9 +51,12 @@ export default function CompleteProfileScreen() {
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.8,
+      base64: true,
     });
-    if (!result.canceled && result.assets[0]?.uri) {
-      setAvatarUri(result.assets[0].uri);
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      setAvatarUri(asset.uri);
+      setAvatarBase64(asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : null);
     }
   }
 
@@ -64,17 +68,23 @@ export default function CompleteProfileScreen() {
     }
     setSaving(true);
     try {
+      let finalAvatarUri = user?.avatar_uri || null;
+      if (avatarBase64) {
+        const { avatar_uri } = await usersApi.uploadAvatar(avatarBase64);
+        finalAvatarUri = avatar_uri;
+      }
       const u = await usersApi.update({
         name: trimmedName,
         email: email.trim() || undefined,
+        avatar_uri: finalAvatarUri ?? undefined,
       });
       updateUser({
         ...u,
-        avatar_uri: avatarUri ?? (u as { avatar_uri?: string })?.avatar_uri,
+        avatar_uri: finalAvatarUri ?? (u as { avatar_uri?: string })?.avatar_uri,
       });
       router.replace("/(tabs)/map");
-    } catch (_) {
-      Alert.alert("Error", "Could not save. Try again.");
+    } catch (err: any) {
+      Alert.alert("Error", err?.message || "Could not save. Try again.");
     } finally {
       setSaving(false);
     }

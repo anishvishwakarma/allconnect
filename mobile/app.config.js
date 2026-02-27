@@ -1,6 +1,11 @@
 module.exports = {
   expo: {
     name: "AllConnect",
+    extra: {
+      eas: {
+        projectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID || undefined,
+      },
+    },
     slug: "allconnect",
     version: "1.0.0",
     orientation: "portrait",
@@ -27,6 +32,6 @@ module.exports = {
         googleMaps: { apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || "placeholder" },
       },
     },
-    plugins: ["expo-router", "expo-location"],
+    plugins: ["expo-router", "expo-location", "expo-notifications"],
   },
 };

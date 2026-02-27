@@ -2,6 +2,7 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../db');
 const { authMiddleware } = require('../middleware/auth');
+const { sendPushToUser } = require('../services/notifications');
 
 const router = express.Router({ mergeParams: true });
 
@@ -125,6 +126,11 @@ router.post('/approve', authMiddleware, async (req, res) => {
         `INSERT INTO post_participations (post_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
         [postId, userId]
       );
+      sendPushToUser(userId, {
+        title: 'Request approved',
+        body: 'Your join request was approved! Open the post to join the group chat.',
+        data: { type: 'join_approved', postId },
+      }).catch((e) => console.error('Push on approve:', e));
     }
     return res.json({ success: true });
   } catch (err) {

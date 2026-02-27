@@ -72,8 +72,18 @@ export const authApi = {
 // ── Users ────────────────────────────────────────────────
 export const usersApi = {
   me: () => request<User>('/api/users/me'),
-  update: (data: { name?: string; email?: string }) =>
+  update: (data: { name?: string; email?: string; avatar_uri?: string }) =>
     request<User>('/api/users/me', { method: 'PATCH', body: JSON.stringify(data) }),
+  uploadAvatar: (base64Image: string) =>
+    request<{ avatar_uri: string }>('/api/users/avatar', {
+      method: 'POST',
+      body: JSON.stringify({ image: base64Image }),
+    }),
+  registerPushToken: (token: string, platform?: string) =>
+    request<{ success: boolean }>('/api/users/push-token', {
+      method: 'POST',
+      body: JSON.stringify({ token, platform }),
+    }),
   deleteAccount: () =>
     request<{ success: boolean }>('/api/users/me', { method: 'DELETE' }),
 };

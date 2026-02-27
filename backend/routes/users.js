@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const { authMiddleware } = require('../middleware/auth');
+const { uploadAvatar } = require('../services/storage');
 
 const router = express.Router();
 
@@ -32,10 +33,56 @@ router.get('/me', async (req, res) => {
   }
 });
 
+// POST /api/users/avatar — upload avatar image (base64), returns { avatar_uri }
+router.post('/avatar', async (req, res) => {
+  try {
+    const image = req.body?.image;
+    if (!image || typeof image !== 'string') {
+      return res.status(400).json({ error: 'image (base64) required' });
+    }
+    let url;
+    try {
+      url = await uploadAvatar(req.userId, image);
+    } catch (err) {
+      return res.status(400).json({ error: err.message || 'Upload failed' });
+    }
+    if (!url) {
+      return res.status(503).json({ error: 'Storage not configured' });
+    }
+    await db.query(
+      'UPDATE users SET avatar_uri = $1, updated_at = NOW() WHERE id = $2',
+      [url, req.userId]
+    );
+    return res.json({ avatar_uri: url });
+  } catch (err) {
+    console.error('users/avatar', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST /api/users/push-token — register Expo push token
+router.post('/push-token', async (req, res) => {
+  try {
+    const token = (req.body?.token || '').trim();
+    const platform = (req.body?.platform || 'unknown').trim();
+    if (!token) return res.status(400).json({ error: 'token required' });
+    await db.query(
+      `INSERT INTO device_tokens (user_id, token, platform)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (user_id, token) DO UPDATE SET platform = $3, created_at = NOW()`,
+      [req.userId, token, platform]
+    );
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('users/push-token', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // PATCH /api/users/me
 router.patch('/me', async (req, res) => {
   try {
-    const { name, email } = req.body || {};
+    const { name, email, avatar_uri } = req.body || {};
     const updates = [];
     const values = [];
     let i = 1;
@@ -46,6 +93,10 @@ router.patch('/me', async (req, res) => {
     if (email !== undefined) {
       updates.push(`email = $${i++}`);
       values.push(email === '' ? null : email);
+    }
+    if (avatar_uri !== undefined) {
+      updates.push(`avatar_uri = $${i++}`);
+      values.push(avatar_uri === '' ? null : avatar_uri);
     }
     if (updates.length === 0) {
       const user = await db.row('SELECT * FROM users WHERE id = $1', [req.userId]);

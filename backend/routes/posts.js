@@ -25,23 +25,38 @@ function postRowToJson(r) {
   };
 }
 
-// GET /api/posts/nearby?lat=&lng=&radius_km=15
+// GET /api/posts/nearby?lat=&lng=&radius_km=15&category=&from=&to=
 router.get('/nearby', async (req, res) => {
   try {
     const lat = parseFloat(req.query.lat);
     const lng = parseFloat(req.query.lng);
     const radiusKm = parseFloat(req.query.radius_km) || 15;
+    const category = (req.query.category || '').trim();
+    const from = (req.query.from || '').trim();
+    const to = (req.query.to || '').trim();
     if (isNaN(lat) || isNaN(lng)) {
       return res.status(400).json({ error: 'lat and lng required' });
     }
     const degPerKm = 1 / 111;
     const delta = radiusKm * degPerKm;
-    const rows = await db.rows(
-      `SELECT * FROM posts WHERE status = 'open' AND event_at > NOW()
-       AND lat BETWEEN $1 AND $2 AND lng BETWEEN $3 AND $4
-       ORDER BY event_at ASC LIMIT 100`,
-      [lat - delta, lat + delta, lng - delta, lng + delta]
-    );
+    let sql = `SELECT * FROM posts WHERE status = 'open' AND event_at > NOW()
+       AND lat BETWEEN $1 AND $2 AND lng BETWEEN $3 AND $4`;
+    const params = [lat - delta, lat + delta, lng - delta, lng + delta];
+    let i = 5;
+    if (category) {
+      sql += ` AND category = $${i++}`;
+      params.push(category);
+    }
+    if (from) {
+      sql += ` AND event_at >= $${i++}`;
+      params.push(from);
+    }
+    if (to) {
+      sql += ` AND event_at <= $${i++}`;
+      params.push(to);
+    }
+    sql += ' ORDER BY event_at ASC LIMIT 100';
+    const rows = await db.rows(sql, params);
     return res.json(rows.map(postRowToJson));
   } catch (err) {
     console.error('posts/nearby', err);
