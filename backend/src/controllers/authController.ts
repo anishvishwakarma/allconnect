@@ -5,7 +5,7 @@ import { signToken } from '../middleware/auth';
 import { sendError, sendSuccess } from '../utils/helpers';
 
 export async function verifyAuth(req: Request, res: Response): Promise<void> {
-  const { idToken } = req.body as { idToken?: string };
+  const { idToken, mobile } = req.body as { idToken?: string; mobile?: string };
   if (!idToken) {
     sendError(res, 400, 'idToken is required');
     return;
@@ -16,17 +16,25 @@ export async function verifyAuth(req: Request, res: Response): Promise<void> {
     const decoded = await verifyFirebaseToken(idToken);
     const { uid, phone_number } = decoded;
 
-    if (!phone_number) {
-      sendError(res, 400, 'Token does not contain a phone number');
-      return;
-    }
+    // phone_number present for phone-OTP auth; mobile from body for email/password auth
+    const phone = phone_number || mobile || null;
 
     // Upsert user
     let user = await User.findOne({ firebaseUid: uid });
     if (!user) {
+      if (!phone) {
+        sendError(res, 400, 'Mobile number is required for registration');
+        return;
+      }
+      // Prevent duplicate mobile registrations
+      const duplicate = await User.findOne({ phone });
+      if (duplicate) {
+        sendError(res, 409, 'Mobile number already registered');
+        return;
+      }
       user = await User.create({
         firebaseUid: uid,
-        phone: phone_number,
+        phone,
       });
     }
 

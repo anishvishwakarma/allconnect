@@ -14,4 +14,13 @@ router.post(
   verifyAuth
 );
 
+// Alias used by mobile app (email/password Firebase auth)
+router.post(
+  '/firebase',
+  authLimiter,
+  body('idToken').notEmpty().withMessage('idToken is required'),
+  validate,
+  verifyAuth
+);
+
 export default router;
