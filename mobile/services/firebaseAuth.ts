@@ -3,14 +3,18 @@
  */
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import {
-  getAuth,
+  initializeAuth,
+  getReactNativePersistence,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   sendEmailVerification,
   sendPasswordResetEmail,
+  getAuth,
+  Auth,
   User,
   UserCredential,
 } from 'firebase/auth';
+import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
 
 const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
@@ -22,6 +26,7 @@ const firebaseConfig = {
 };
 
 let app: FirebaseApp | null = null;
+let auth: Auth | null = null;
 
 function getFirebaseApp(): FirebaseApp {
   if (!app) {
@@ -30,8 +35,21 @@ function getFirebaseApp(): FirebaseApp {
   return app;
 }
 
-export function getFirebaseAuthInstance() {
-  return getAuth(getFirebaseApp());
+export function getFirebaseAuthInstance(): Auth {
+  if (auth) return auth;
+  const firebaseApp = getFirebaseApp();
+  try {
+    auth = initializeAuth(firebaseApp, {
+      persistence: getReactNativePersistence(ReactNativeAsyncStorage),
+    });
+  } catch (e: any) {
+    if (e?.code === 'auth/already-initialized') {
+      auth = getAuth(firebaseApp);
+    } else {
+      throw e;
+    }
+  }
+  return auth;
 }
 
 export async function signUpWithEmail(email: string, password: string): Promise<UserCredential> {

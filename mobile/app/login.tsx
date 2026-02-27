@@ -126,20 +126,30 @@ export default function LoginScreen() {
       const { token, user } = await authApi.firebaseLogin(idToken, mob); // mobile linked to email for messaging
       setAuth(token, user);
       Alert.alert(
-        "Verify your email",
-        "We sent a verification link to your email. You can continue now and verify later."
+        "Account created!",
+        "We sent a verification link to your email. You can continue now and verify later.",
+        [{ text: "Continue", onPress: () => router.replace(user.name?.trim() ? "/(tabs)/map" : "/complete-profile") }]
       );
-      router.replace(user.name?.trim() ? "/(tabs)/map" : "/complete-profile");
     } catch (err: any) {
       const msg = err?.message || "Sign up failed.";
       if (msg.includes("email-already-in-use"))
-        Alert.alert("Email in use", "An account with this email already exists. Try signing in.");
+        Alert.alert(
+          "Already registered",
+          "An account with this email already exists. Sign in to continue.",
+          [{ text: "Sign in", onPress: () => setMode("signin") }]
+        );
       else if (msg.includes("Mobile number already"))
         Alert.alert("Mobile in use", "This mobile number is already registered.");
       else if (msg.includes("weak-password"))
         Alert.alert("Weak password", "Use at least 6 characters.");
       else if (msg.includes("Network error"))
         Alert.alert("Connection error", "Check your internet connection and try again.");
+      else if (msg.includes("Invalid") || msg.includes("token") || msg.includes("Verification"))
+        Alert.alert(
+          "Registration issue",
+          "Your account may have been created. Try signing in with your email and password.",
+          [{ text: "Sign in", onPress: () => setMode("signin") }]
+        );
       else Alert.alert("Error", msg);
     } finally {
       setLoading(false);

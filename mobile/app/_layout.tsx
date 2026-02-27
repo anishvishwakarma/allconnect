@@ -1,14 +1,19 @@
 import { useEffect } from "react";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import Constants from "expo-constants";
 import { ThemeProvider, useAppTheme } from "../context/ThemeContext";
 import { useAuthStore } from "../store/auth";
-import { registerForPushNotifications } from "../services/pushNotifications";
 
 function RootStack() {
   const token = useAuthStore((s) => s.token);
   useEffect(() => {
-    if (token) registerForPushNotifications();
+    if (!token) return;
+    // Push notifications not supported in Expo Go (SDK 53+)
+    if (Constants.appOwnership === "expo") return;
+    import("../services/pushNotifications")
+      .then((m) => m.registerForPushNotifications())
+      .catch(() => {});
   }, [token]);
   const { isDark } = useAppTheme();
   return (
