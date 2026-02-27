@@ -15,12 +15,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuthStore } from "../store/auth";
 import { usersApi } from "../services/api";
 import { getInitials } from "../utils/profile";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAppTheme } from "../context/ThemeContext";
 import { useAlert } from "../context/AlertContext";
 
 const PRIMARY = "#E8751A";
 
 export default function CompleteProfileScreen() {
+  const insets = useSafeAreaInsets();
   const { token, user, updateUser } = useAuthStore();
   const { isDark } = useAppTheme();
   const alert = useAlert();
@@ -94,7 +96,7 @@ export default function CompleteProfileScreen() {
   const initial = getInitials(name || user?.name);
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: bg }} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
+    <ScrollView style={{ flex: 1, backgroundColor: bg }} contentContainerStyle={[s.content, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 48 }]} keyboardShouldPersistTaps="handled">
       <Text style={[s.title, { color: text }]}>Complete your profile</Text>
       <Text style={[s.subtitle, { color: sub }]}>Add your name, email and optional photo.</Text>
 
@@ -140,7 +142,7 @@ export default function CompleteProfileScreen() {
 }
 
 const s = StyleSheet.create({
-  content: { padding: 24, paddingTop: 60, paddingBottom: 48 },
+  content: { padding: 24 },
   title: { fontSize: 24, fontWeight: "800", marginBottom: 8 },
   subtitle: { fontSize: 14, marginBottom: 24 },
   avatarWrap: {

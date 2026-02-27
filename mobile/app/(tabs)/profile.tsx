@@ -9,12 +9,14 @@ import { usersApi } from "../../services/api";
 import { useAuthStore } from "../../store/auth";
 import { disconnectSocket } from "../../services/socket";
 import { getInitials } from "../../utils/profile";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAppTheme } from "../../context/ThemeContext";
 import { useAlert } from "../../context/AlertContext";
 
 const PRIMARY = "#E8751A";
 
 export default function ProfileScreen() {
+  const insets = useSafeAreaInsets();
   const { token, user, updateUser, logout } = useAuthStore();
   const { isDark } = useAppTheme();
   const alert = useAlert();
@@ -36,7 +38,7 @@ export default function ProfileScreen() {
 
   if (!token) {
     return (
-      <View style={[s.center, { backgroundColor: bg }]}>
+      <View style={[s.center, { backgroundColor: bg, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
         <View style={[s.bigAvatar, { backgroundColor: PRIMARY + "18" }]}>
           <Ionicons name="person-circle-outline" size={48} color={PRIMARY} />
         </View>
@@ -72,9 +74,9 @@ export default function ProfileScreen() {
   const initial = getInitials(user?.name);
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: bg }} contentContainerStyle={{ paddingBottom: 48 }} showsVerticalScrollIndicator={false}>
+    <ScrollView style={{ flex: 1, backgroundColor: bg }} contentContainerStyle={{ paddingBottom: insets.bottom + 48 }} showsVerticalScrollIndicator={false}>
       {/* Header */}
-      <View style={[s.header, { borderBottomColor: border }]}>
+      <View style={[s.header, { borderBottomColor: border, paddingTop: insets.top + 16 }]}>
         <Text style={[s.title, { color: text }]}>Profile</Text>
         {!editing ? (
           <TouchableOpacity onPress={() => setEditing(true)} style={[s.editBtn, { backgroundColor: PRIMARY + "18", borderColor: PRIMARY + "40" }]}>
@@ -223,7 +225,7 @@ const s = StyleSheet.create({
   emptySub: { fontSize: 14, textAlign: "center", lineHeight: 20 },
   cta: { marginTop: 8, backgroundColor: "#E8751A", paddingHorizontal: 32, paddingVertical: 15, borderRadius: 14, shadowColor: "#E8751A", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
   ctaText: { color: "#fff", fontWeight: "700", fontSize: 15 },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingTop: 56, paddingBottom: 16, borderBottomWidth: StyleSheet.hairlineWidth },
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingBottom: 16, borderBottomWidth: StyleSheet.hairlineWidth },
   title: { fontSize: 28, fontWeight: "800", letterSpacing: -0.5 },
   editBtn: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, borderWidth: 1 },
   editBtnText: { fontSize: 13, fontWeight: "600" },

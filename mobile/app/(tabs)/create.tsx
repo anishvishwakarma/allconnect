@@ -8,6 +8,7 @@ import * as Location from "expo-location";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { postsApi } from "../../services/api";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuthStore } from "../../store/auth";
 import { POST_CATEGORIES } from "../../types";
 import { useAppTheme } from "../../context/ThemeContext";
@@ -21,6 +22,7 @@ const CAT_COLORS: Record<string, string> = {
 };
 
 export default function CreatePostScreen() {
+  const insets = useSafeAreaInsets();
   const token = useAuthStore((s) => s.token);
   const user = useAuthStore((s) => s.user);
   const { isDark } = useAppTheme();
@@ -54,7 +56,7 @@ export default function CreatePostScreen() {
 
   if (!token) {
     return (
-      <View style={[s.center, { backgroundColor: bg }]}>
+      <View style={[s.center, { backgroundColor: bg, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
         <Ionicons name="add-circle-outline" size={56} color={PRIMARY} />
         <Text style={[s.emptyTitle, { color: text }]}>Sign in to post</Text>
         <Text style={[s.emptySub, { color: sub }]}>Share what you're doing and find people nearby</Text>
@@ -69,14 +71,25 @@ export default function CreatePostScreen() {
     setFetchingLoc(true);
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") { alert.show("Permission denied", "Location permission is required.", undefined, "info"); return; }
+      if (status !== "granted") {
+        alert.show("Location needed", "Enable location access in Settings to add your event location.", undefined, "info");
+        return;
+      }
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
       setLat(loc.coords.latitude);
       setLng(loc.coords.longitude);
       const [geo] = await Location.reverseGeocodeAsync({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
       if (geo) setAddressText([geo.street, geo.district, geo.city].filter(Boolean).join(", "));
-    } catch { alert.show("Something went wrong", "Could not get location. Please try again.", undefined, "error"); }
-    finally { setFetchingLoc(false); }
+    } catch (err: any) {
+      const msg = err?.message || "";
+      if (msg.includes("unavailable") || msg.includes("location") || msg.includes("services")) {
+        alert.show("Location unavailable", "Turn on location services in your device settings, then try again.", undefined, "error");
+      } else {
+        alert.show("Something went wrong", "Could not get location. Please try again.", undefined, "error");
+      }
+    } finally {
+      setFetchingLoc(false);
+    }
   }
 
   async function submit() {
@@ -118,7 +131,7 @@ export default function CreatePostScreen() {
   return (
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1, backgroundColor: bg }}>
       {/* Header */}
-      <View style={[s.header, { borderBottomColor: border }]}>
+      <View style={[s.header, { borderBottomColor: border, paddingTop: insets.top + 16 }]}>
         <Text style={[s.title, { color: text }]}>Create Post</Text>
         {!hasSubscription && (
           <View style={[s.limitBadge, { backgroundColor: freeRemaining > 0 ? PRIMARY + "18" : "#FF453A18" }]}>
@@ -289,7 +302,7 @@ const s = StyleSheet.create({
   emptySub: { fontSize: 14, marginTop: 8, textAlign: "center", lineHeight: 20 },
   cta: { marginTop: 20, backgroundColor: "#E8751A", paddingHorizontal: 28, paddingVertical: 14, borderRadius: 14 },
   ctaText: { color: "#fff", fontWeight: "700", fontSize: 14 },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingTop: 56, paddingBottom: 16, borderBottomWidth: StyleSheet.hairlineWidth },
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingBottom: 16, borderBottomWidth: StyleSheet.hairlineWidth },
   title: { fontSize: 28, fontWeight: "800", letterSpacing: -0.5 },
   limitBadge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
   limitText: { fontSize: 11, fontWeight: "700" },

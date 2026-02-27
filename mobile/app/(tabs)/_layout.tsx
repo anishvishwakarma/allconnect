@@ -2,12 +2,14 @@ import { useEffect } from "react";
 import { Tabs, router } from "expo-router";
 import { View, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuthStore } from "../../store/auth";
 import { useAppTheme } from "../../context/ThemeContext";
 
 const PRIMARY = "#E8751A";
 
 export default function TabsLayout() {
+  const insets = useSafeAreaInsets();
   const token = useAuthStore((s) => s.token);
   const { isDark } = useAppTheme();
 
@@ -28,8 +30,8 @@ export default function TabsLayout() {
           backgroundColor: bg,
           borderTopColor: border,
           borderTopWidth: StyleSheet.hairlineWidth,
-          height: 80,
-          paddingBottom: 22,
+          height: 56 + insets.bottom,
+          paddingBottom: insets.bottom,
           paddingTop: 10,
           elevation: 0,
           shadowOpacity: 0,

@@ -1,3 +1,5 @@
+const mapsApiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || "";
+
 module.exports = {
   expo: {
     name: "AllConnect",
@@ -20,7 +22,7 @@ module.exports = {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.allconnect.app",
-      config: { googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || "placeholder" },
+      config: { googleMapsApiKey: mapsApiKey },
     },
     android: {
       adaptiveIcon: {
@@ -29,7 +31,7 @@ module.exports = {
       },
       package: "com.allconnect.app",
       config: {
-        googleMaps: { apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || "placeholder" },
+        googleMaps: { apiKey: mapsApiKey },
       },
     },
     plugins: ["expo-router", "expo-location", "expo-notifications"],

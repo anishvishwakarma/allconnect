@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import Constants from "expo-constants";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ThemeProvider, useAppTheme } from "../context/ThemeContext";
 import { AlertProvider } from "../context/AlertContext";
 import { useAuthStore } from "../store/auth";
@@ -33,10 +34,12 @@ function RootStack() {
 
 export default function RootLayout() {
   return (
-    <ThemeProvider>
-      <AlertProvider>
-        <RootStack />
-      </AlertProvider>
-    </ThemeProvider>
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <AlertProvider>
+          <RootStack />
+        </AlertProvider>
+      </ThemeProvider>
+    </SafeAreaProvider>
   );
 }

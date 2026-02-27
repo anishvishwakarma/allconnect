@@ -8,12 +8,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { postsApi, requestsApi, chatsApi } from "../../services/api";
 import { useAuthStore } from "../../store/auth";
 import { CATEGORY_COLORS } from "../../constants/config";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAppTheme } from "../../context/ThemeContext";
 import { useAlert } from "../../context/AlertContext";
 
 const PRIMARY = "#E8751A";
 
 export default function PostDetailScreen() {
+  const insets = useSafeAreaInsets();
   const { id: rawId } = useLocalSearchParams<{ id: string }>();
   const id = typeof rawId === "string" ? rawId : Array.isArray(rawId) ? rawId[0] : "";
   const token = useAuthStore((s) => s.token);
@@ -91,11 +93,11 @@ export default function PostDetailScreen() {
   }
 
   if (loading) {
-    return <View style={[s.center, { backgroundColor: bg }]}><ActivityIndicator color={PRIMARY} size="large" /></View>;
+    return <View style={[s.center, { backgroundColor: bg, paddingTop: insets.top, paddingBottom: insets.bottom }]}><ActivityIndicator color={PRIMARY} size="large" /></View>;
   }
   if (!post) {
     return (
-      <View style={[s.center, { backgroundColor: bg }]}>
+      <View style={[s.center, { backgroundColor: bg, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
         <Ionicons name="warning-outline" size={48} color={sub} />
         <Text style={[s.emptyTitle, { color: text }]}>Post not found</Text>
         <TouchableOpacity onPress={() => router.back()} style={s.backCta}>
@@ -111,9 +113,9 @@ export default function PostDetailScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: bg }}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 + insets.bottom }}>
         {/* ── Top bar ── */}
-        <View style={[s.topBar]}>
+        <View style={[s.topBar, { paddingTop: insets.top + 12 }]}>
           <TouchableOpacity onPress={() => router.back()} style={[s.backBtn, { backgroundColor: isDark ? "#1A1A1F" : "#F0F0F3" }]}>
             <Ionicons name="arrow-back" size={18} color={PRIMARY} />
           </TouchableOpacity>
@@ -285,7 +287,7 @@ const s = StyleSheet.create({
   emptySub: { fontSize: 14, textAlign: "center" },
   backCta: { marginTop: 16 },
   backCtaText: { fontSize: 15, fontWeight: "600" },
-  topBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingTop: 56, paddingBottom: 12 },
+  topBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingBottom: 12 },
   backBtn: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
   statusPill: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
   statusDot: { width: 7, height: 7, borderRadius: 3.5 },

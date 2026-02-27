@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  useColorScheme, ActivityIndicator, Dimensions,
+  ActivityIndicator, Dimensions,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import MapView, { Marker, PROVIDER_GOOGLE, MapMarkerProps } from "react-native-maps";
 // Workaround: react-native-maps types omit React's built-in `key` prop
 const AnyMarker = Marker as React.ComponentType<MapMarkerProps & { key?: React.Key; children?: React.ReactNode }>;
@@ -15,6 +16,7 @@ import { useAppTheme } from "../../context/ThemeContext";
 import { useAlert } from "../../context/AlertContext";
 
 const PRIMARY = "#E8751A";
+const AUTO_REFRESH_INTERVAL_MS = 45000; // 45 seconds - auto-refresh to show new activities
 const { height: SCREEN_H } = Dimensions.get("window");
 
 const CATEGORIES = ["activity","need","selling","meetup","event","study","nightlife","other"] as const;
@@ -30,6 +32,12 @@ const CAT_COLORS: Record<string, string> = {
   nightlife: "#E8751A", other: "#636366",
 };
 
+function formatEventTime(iso?: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? "—" : d.toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
 function getDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number) {
   const R = 6371, dLat = ((lat2 - lat1) * Math.PI) / 180, dLon = ((lon2 - lon1) * Math.PI) / 180;
   const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
@@ -37,6 +45,7 @@ function getDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number) {
 }
 
 export default function MapScreen() {
+  const insets = useSafeAreaInsets();
   const token = useAuthStore((s) => s.token);
   const user = useAuthStore((s) => s.user);
   const { isDark } = useAppTheme();
@@ -50,10 +59,13 @@ export default function MapScreen() {
   const [locationGranted, setLocationGranted] = useState(false);
   const [reqLoading, setReqLoading] = useState(false);
   const [reqDone, setReqDone] = useState(false);
+  const regionRef = useRef(region);
+  regionRef.current = region;
+  const mapRef = useRef<MapView>(null);
 
   const fetchPins = useCallback(async () => {
     setLoading(true);
-    const { latitude, longitude } = region;
+    const { latitude, longitude } = regionRef.current;
     const params: Record<string, string> = {};
     if (filter.category) params.category = filter.category;
     if (filter.when === "today") {
@@ -71,24 +83,53 @@ export default function MapScreen() {
     try { setPins(await postsApi.nearby(latitude, longitude, 15, params)); }
     catch { setPins([]); }
     finally { setLoading(false); }
-  }, [region.latitude, region.longitude, filter]);
+  }, [filter]);
 
   useEffect(() => { fetchPins(); }, [fetchPins]);
 
+  useEffect(() => {
+    const id = setInterval(fetchPins, AUTO_REFRESH_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [fetchPins]);
+
   async function getLocation() {
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== "granted") return;
-    const loc = await Location.getCurrentPositionAsync({});
-    const { latitude, longitude } = loc.coords;
-    setRegion((r) => ({ ...r, latitude, longitude }));
-    setUserLocation({ latitude, longitude });
-    setLocationGranted(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        alert.show(
+          "Location needed",
+          "Enable location access in Settings to see events near you.",
+          undefined,
+          "info"
+        );
+        return;
+      }
+      const loc = await Location.getCurrentPositionAsync({});
+      const { latitude, longitude } = loc.coords;
+      setRegion((r) => ({ ...r, latitude, longitude }));
+      setUserLocation({ latitude, longitude });
+      setLocationGranted(true);
+    } catch (err: any) {
+      const msg = err?.message || "";
+      if (msg.includes("unavailable") || msg.includes("location") || msg.includes("services")) {
+        alert.show(
+          "Location unavailable",
+          "Turn on location services in your device settings, then try again.",
+          undefined,
+          "error"
+        );
+      } else {
+        alert.show("Location error", "Could not get your location. Try again later.", undefined, "error");
+      }
+    }
   }
 
   useEffect(() => {
-    Location.getForegroundPermissionsAsync().then(({ status }) => {
-      if (status === "granted") getLocation();
-    });
+    Location.getForegroundPermissionsAsync()
+      .then(({ status }) => {
+        if (status === "granted") return getLocation();
+      })
+      .catch(() => {});
   }, []);
 
   async function handleJoin() {
@@ -111,6 +152,7 @@ export default function MapScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: bg }}>
       <MapView
+        ref={mapRef}
         provider={PROVIDER_GOOGLE}
         style={StyleSheet.absoluteFillObject}
         region={region}
@@ -122,7 +164,19 @@ export default function MapScreen() {
           <AnyMarker
             key={pin.id}
             coordinate={{ latitude: pin.lat, longitude: pin.lng }}
-            onPress={() => { setSelectedPin(pin); setReqDone(false); }}
+            onPress={() => {
+              setSelectedPin(pin);
+              setReqDone(false);
+              // Momo-style: center map on selected pin for clear pin–card connection
+              if (pin?.lat != null && pin?.lng != null) {
+                mapRef.current?.animateToRegion({
+                  latitude: pin.lat,
+                  longitude: pin.lng,
+                  latitudeDelta: 0.02,
+                  longitudeDelta: 0.02,
+                }, 300);
+              }
+            }}
           >
             <View style={[s.markerOuter, { borderColor: CAT_COLORS[pin.category] || PRIMARY }]}>
               <View style={[s.markerInner, { backgroundColor: CAT_COLORS[pin.category] || PRIMARY }]} />
@@ -132,7 +186,7 @@ export default function MapScreen() {
       </MapView>
 
       {/* ── Filter chips + Refresh ── */}
-      <View style={[s.filtersContainer]}>
+      <View style={[s.filtersContainer, { top: insets.top + 8 }]}>
         <TouchableOpacity
           onPress={() => fetchPins()}
           disabled={loading}
@@ -144,7 +198,7 @@ export default function MapScreen() {
           {WHEN_FILTERS.map(({ key, label }) => (
             <TouchableOpacity
               key={key}
-              onPress={() => setFilter((f) => ({ ...f, when: f.when === key ? undefined : key }))}
+              onPress={() => { setLoading(true); setFilter((f) => ({ ...f, when: f.when === key ? undefined : key })); }}
               style={[s.chip, { backgroundColor: filter.when === key ? PRIMARY : surface, borderColor: filter.when === key ? PRIMARY : border }]}
             >
               <Text style={[s.chipText, { color: filter.when === key ? "#fff" : text }]}>{label}</Text>
@@ -154,7 +208,7 @@ export default function MapScreen() {
           {CATEGORIES.map((cat) => (
             <TouchableOpacity
               key={cat}
-              onPress={() => setFilter((f) => ({ ...f, category: f.category === cat ? undefined : cat }))}
+              onPress={() => { setLoading(true); setFilter((f) => ({ ...f, category: f.category === cat ? undefined : cat })); }}
               style={[s.chip, { backgroundColor: filter.category === cat ? CAT_COLORS[cat] : surface, borderColor: filter.category === cat ? CAT_COLORS[cat] : border }]}
             >
               <View style={[s.catDot, { backgroundColor: CAT_COLORS[cat] || "#636366", opacity: filter.category === cat ? 0 : 1 }]} />
@@ -166,14 +220,14 @@ export default function MapScreen() {
 
       {/* ── Location FAB ── */}
       {!locationGranted && (
-        <TouchableOpacity onPress={getLocation} style={[s.fab, { backgroundColor: surface, borderColor: border, right: 20, bottom: selectedPin ? 220 : 100 }]}>
+        <TouchableOpacity onPress={getLocation} style={[s.fab, { backgroundColor: surface, borderColor: border, right: 20, bottom: (selectedPin ? 220 : 100) + insets.bottom }]}>
           <Ionicons name="locate-outline" size={20} color={PRIMARY} />
         </TouchableOpacity>
       )}
 
       {/* ── Loading indicator ── */}
       {loading && (
-        <View style={[s.loadingBadge, { backgroundColor: surface }]}>
+        <View style={[s.loadingBadge, { backgroundColor: surface, top: insets.top + 110 }]}>
           <ActivityIndicator size="small" color={PRIMARY} />
           <Text style={[s.loadingText, { color: sub }]}>Refreshing...</Text>
         </View>
@@ -181,7 +235,7 @@ export default function MapScreen() {
 
       {/* ── Pin detail card ── */}
       {selectedPin && (
-        <View style={[s.pinCard, { backgroundColor: surface, borderColor: border }]}>
+        <View style={[s.pinCard, { backgroundColor: surface, borderColor: border, bottom: insets.bottom }]}>
           <View style={s.handle} />
           <View style={{ flexDirection: "row", alignItems: "flex-start", marginBottom: 12 }}>
             <View style={{ flex: 1 }}>
@@ -198,8 +252,8 @@ export default function MapScreen() {
           </View>
 
           <View style={{ flexDirection: "row", gap: 16, marginBottom: 16 }}>
-            <PinMeta icon="time-outline" value={new Date(selectedPin.event_at || selectedPin.eventAt).toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })} sub={sub} />
-            <PinMeta icon="people-outline" value={`Max ${selectedPin.max_people ?? selectedPin.maxParticipants}`} sub={sub} />
+            <PinMeta icon="time-outline" value={formatEventTime(selectedPin.event_at ?? selectedPin.eventAt)} sub={sub} />
+            <PinMeta icon="people-outline" value={`Max ${selectedPin.max_people ?? selectedPin.maxParticipants ?? "—"}`} sub={sub} />
             {userLocation && (
               <PinMeta icon="navigate-outline" value={`${getDistanceKm(userLocation.latitude, userLocation.longitude, selectedPin.lat, selectedPin.lng).toFixed(1)} km`} sub={sub} />
             )}
@@ -258,7 +312,7 @@ function PinMeta({ icon, value, sub }: { icon: any; value: string; sub: string }
 const s = StyleSheet.create({
   markerOuter: { width: 22, height: 22, borderRadius: 11, borderWidth: 2.5, alignItems: "center", justifyContent: "center", backgroundColor: "#fff" },
   markerInner: { width: 10, height: 10, borderRadius: 5 },
-  filtersContainer: { position: "absolute", top: 56, left: 0, right: 0, flexDirection: "row", alignItems: "center", paddingVertical: 8 },
+  filtersContainer: { position: "absolute", left: 0, right: 0, flexDirection: "row", alignItems: "center", paddingVertical: 8 },
   refreshBtn: {
     width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center",
     marginLeft: 16, borderWidth: 1,
@@ -281,14 +335,14 @@ const s = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 12, elevation: 6,
   },
   loadingBadge: {
-    position: "absolute", top: 110, alignSelf: "center",
+    position: "absolute", alignSelf: "center",
     flexDirection: "row", alignItems: "center", gap: 8,
     paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
     shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 8, elevation: 4,
   },
   loadingText: { fontSize: 13, fontWeight: "500" },
   pinCard: {
-    position: "absolute", bottom: 0, left: 0, right: 0,
+    position: "absolute", left: 0, right: 0,
     borderTopLeftRadius: 28, borderTopRightRadius: 28,
     padding: 20, paddingBottom: 36,
     borderTopWidth: StyleSheet.hairlineWidth,

@@ -5,6 +5,7 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuthStore } from "../../store/auth";
 import { postsApi } from "../../services/api";
 import { useAppTheme } from "../../context/ThemeContext";
@@ -17,6 +18,7 @@ const CAT_COLORS: Record<string, string> = {
 };
 
 export default function HistoryScreen() {
+  const insets = useSafeAreaInsets();
   const token = useAuthStore((s) => s.token);
   const user = useAuthStore((s) => s.user);
   const { isDark } = useAppTheme();
@@ -40,7 +42,7 @@ export default function HistoryScreen() {
 
   if (!token) {
     return (
-      <View style={[s.center, { backgroundColor: bg }]}>
+      <View style={[s.center, { backgroundColor: bg, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
         <Ionicons name="time-outline" size={48} color={PRIMARY} />
         <Text style={[s.emptyTitle, { color: text }]}>Sign in to see history</Text>
         <Text style={[s.emptySub, { color: sub }]}>Posts you created or joined will appear here</Text>
@@ -53,7 +55,7 @@ export default function HistoryScreen() {
 
   return (
     <View style={[{ flex: 1 }, { backgroundColor: bg }]}>
-      <View style={[s.header, { borderBottomColor: border }]}>
+      <View style={[s.header, { borderBottomColor: border, paddingTop: insets.top + 16 }]}>
         <Text style={[s.title, { color: text }]}>History</Text>
         <Text style={[s.subtitle, { color: sub }]}>Your posts and joined events</Text>
       </View>
@@ -63,7 +65,7 @@ export default function HistoryScreen() {
         <FlatList
           data={items}
           keyExtractor={(item) => item.id + (item.role || "")}
-          contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 40 }}
+          contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: insets.bottom + 40 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={PRIMARY} />}
           ListEmptyComponent={
             <View style={[s.center, { paddingTop: 60 }]}>
@@ -122,7 +124,7 @@ export default function HistoryScreen() {
 }
 
 const s = StyleSheet.create({
-  header: { paddingHorizontal: 20, paddingTop: 56, paddingBottom: 16, borderBottomWidth: StyleSheet.hairlineWidth },
+  header: { paddingHorizontal: 20, paddingBottom: 16, borderBottomWidth: StyleSheet.hairlineWidth },
   title: { fontSize: 28, fontWeight: "800", letterSpacing: -0.5 },
   subtitle: { fontSize: 13, marginTop: 2 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32 },

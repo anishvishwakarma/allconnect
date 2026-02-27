@@ -15,12 +15,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuthStore } from "../../store/auth";
 import { usersApi } from "../../services/api";
 import { getInitials } from "../../utils/profile";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAppTheme } from "../../context/ThemeContext";
 import { useAlert } from "../../context/AlertContext";
 
 const PRIMARY = "#E8751A";
 
 export default function EditProfileScreen() {
+  const insets = useSafeAreaInsets();
   const token = useAuthStore((s) => s.token);
   const user = useAuthStore((s) => s.user);
   const updateUser = useAuthStore((s) => s.updateUser);
@@ -101,7 +103,7 @@ export default function EditProfileScreen() {
   const initial = getInitials(name || user?.name);
 
   return (
-    <ScrollView style={[s.scroll, { backgroundColor: bg }]} contentContainerStyle={s.content}>
+    <ScrollView style={[s.scroll, { backgroundColor: bg }]} contentContainerStyle={[s.content, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 24 }]}>
       <Text style={[s.title, { color: text }]}>Edit profile</Text>
 
       <TouchableOpacity onPress={pickImage} style={[s.avatarWrap, { borderColor: border, backgroundColor: surface }]}>
