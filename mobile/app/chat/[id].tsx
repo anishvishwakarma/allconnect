@@ -88,7 +88,7 @@ export default function ChatScreen() {
     const t = input.trim();
     if (!t || expired) return;
     setInput("");
-    clearTimeout(typingTimer.current);
+    if (typingTimer.current != null) clearTimeout(typingTimer.current);
     emitStopTyping(id);
     try {
       const msg = await chatsApi.send(id, t);

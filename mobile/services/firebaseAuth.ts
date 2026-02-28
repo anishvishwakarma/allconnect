@@ -3,8 +3,6 @@
  */
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import {
-  initializeAuth,
-  getReactNativePersistence,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   sendEmailVerification,
@@ -14,7 +12,6 @@ import {
   User,
   UserCredential,
 } from 'firebase/auth';
-import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
 
 const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
@@ -38,17 +35,7 @@ function getFirebaseApp(): FirebaseApp {
 export function getFirebaseAuthInstance(): Auth {
   if (auth) return auth;
   const firebaseApp = getFirebaseApp();
-  try {
-    auth = initializeAuth(firebaseApp, {
-      persistence: getReactNativePersistence(ReactNativeAsyncStorage),
-    });
-  } catch (e: any) {
-    if (e?.code === 'auth/already-initialized') {
-      auth = getAuth(firebaseApp);
-    } else {
-      throw e;
-    }
-  }
+  auth = getAuth(firebaseApp);
   return auth;
 }
 
