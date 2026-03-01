@@ -5,7 +5,7 @@ module.exports = {
     name: "AllConnect",
     extra: {
       eas: {
-        projectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID || "21b64dc2-fcb5-4619-911d-80f8228a19b2",
+        projectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID || "58c0688a-478a-4e60-b4ec-cdb78d108e11",
       },
     },
     slug: "allconnect",

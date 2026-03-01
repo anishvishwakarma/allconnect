@@ -11,6 +11,7 @@ import {
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { getBottomInset } from "../constants/config";
 import { useAppTheme } from "../context/ThemeContext";
 import { useThemeStore } from "../store/theme";
 import { useAuthStore } from "../store/auth";
@@ -110,7 +111,7 @@ export default function SettingsScreen() {
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: bg }}
-      contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+      contentContainerStyle={{ paddingBottom: getBottomInset(insets.bottom) + 24 }}
       showsVerticalScrollIndicator={false}
     >
       <View style={[s.header, { paddingTop: insets.top + 12, borderBottomColor: border }]}>

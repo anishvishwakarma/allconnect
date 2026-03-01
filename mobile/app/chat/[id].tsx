@@ -10,6 +10,7 @@ import { chatsApi } from "../../services/api";
 import { getSocket, joinChatRoom, leaveChatRoom, emitTyping, emitStopTyping } from "../../services/socket";
 import { useAuthStore } from "../../store/auth";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { getBottomInset } from "../../constants/config";
 import { useAppTheme } from "../../context/ThemeContext";
 import { useAlert } from "../../context/AlertContext";
 
@@ -125,7 +126,7 @@ export default function ChatScreen() {
 
   if (token && !id) {
     return (
-      <View style={[s.center, { flex: 1, backgroundColor: bg, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+      <View style={[s.center, { flex: 1, backgroundColor: bg, paddingTop: insets.top, paddingBottom: getBottomInset(insets.bottom) }]}>
         <Text style={[s.emptyTitle, { color: text }]}>Chat not found</Text>
         <TouchableOpacity onPress={() => router.back()} style={[s.backCta]}>
           <Text style={[s.backCtaText, { color: PRIMARY }]}>Go back</Text>
@@ -186,7 +187,7 @@ export default function ChatScreen() {
 
       {/* Input bar */}
       {!expired ? (
-        <View style={[s.inputBar, { backgroundColor: surface, borderTopColor: border, paddingBottom: insets.bottom + 10 }]}>
+        <View style={[s.inputBar, { backgroundColor: surface, borderTopColor: border, paddingBottom: getBottomInset(insets.bottom) + 10 }]}>
           <TextInput
             value={input} onChangeText={handleChange}
             placeholder="Message..." placeholderTextColor={sub}
@@ -202,7 +203,7 @@ export default function ChatScreen() {
           </TouchableOpacity>
         </View>
       ) : (
-        <View style={[s.expiredBar, { backgroundColor: "#FF453A10", borderTopColor: "#FF453A30", paddingBottom: insets.bottom + 14 }]}>
+        <View style={[s.expiredBar, { backgroundColor: "#FF453A10", borderTopColor: "#FF453A30", paddingBottom: getBottomInset(insets.bottom) + 14 }]}>
           <Ionicons name="lock-closed-outline" size={14} color="#FF453A" />
           <Text style={s.expiredBarText}>This group chat has ended</Text>
         </View>

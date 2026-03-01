@@ -9,6 +9,7 @@ import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { postsApi } from "../../services/api";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { getBottomInset } from "../../constants/config";
 import { useAuthStore } from "../../store/auth";
 import { POST_CATEGORIES } from "../../types";
 import { useAppTheme } from "../../context/ThemeContext";
@@ -56,7 +57,7 @@ export default function CreatePostScreen() {
 
   if (!token) {
     return (
-      <View style={[s.center, { backgroundColor: bg, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+      <View style={[s.center, { backgroundColor: bg, paddingTop: insets.top, paddingBottom: getBottomInset(insets.bottom) }]}>
         <Ionicons name="add-circle-outline" size={56} color={PRIMARY} />
         <Text style={[s.emptyTitle, { color: text }]}>Sign in to post</Text>
         <Text style={[s.emptySub, { color: sub }]}>Share what you're doing and find people nearby</Text>
@@ -143,7 +144,7 @@ export default function CreatePostScreen() {
         )}
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20, paddingBottom: 48, gap: 20 }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20, paddingBottom: 48 + getBottomInset(insets.bottom), gap: 20 }}>
         {/* Title */}
         <Section label="What's happening?" icon="megaphone-outline" iconColor={PRIMARY}>
           <TextInput

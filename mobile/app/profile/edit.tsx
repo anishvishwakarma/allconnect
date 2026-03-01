@@ -16,6 +16,7 @@ import { useAuthStore } from "../../store/auth";
 import { usersApi } from "../../services/api";
 import { getInitials } from "../../utils/profile";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { getBottomInset } from "../../constants/config";
 import { useAppTheme } from "../../context/ThemeContext";
 import { useAlert } from "../../context/AlertContext";
 
@@ -103,7 +104,7 @@ export default function EditProfileScreen() {
   const initial = getInitials(name || user?.name);
 
   return (
-    <ScrollView style={[s.scroll, { backgroundColor: bg }]} contentContainerStyle={[s.content, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 24 }]}>
+    <ScrollView style={[s.scroll, { backgroundColor: bg }]} contentContainerStyle={[s.content, { paddingTop: insets.top + 16, paddingBottom: getBottomInset(insets.bottom) + 24 }]}>
       <Text style={[s.title, { color: text }]}>Edit profile</Text>
 
       <TouchableOpacity onPress={pickImage} style={[s.avatarWrap, { borderColor: border, backgroundColor: surface }]}>

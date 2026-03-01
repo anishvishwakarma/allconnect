@@ -14,6 +14,7 @@ import { useAuthStore } from "../../store/auth";
 import { postsApi, requestsApi } from "../../services/api";
 import { useAppTheme } from "../../context/ThemeContext";
 import { useAlert } from "../../context/AlertContext";
+import { getBottomInset } from "../../constants/config";
 
 const PRIMARY = "#E8751A";
 const AUTO_REFRESH_INTERVAL_MS = 45000; // 45 seconds - auto-refresh to show new activities
@@ -220,7 +221,7 @@ export default function MapScreen() {
 
       {/* ── Location FAB ── */}
       {!locationGranted && (
-        <TouchableOpacity onPress={getLocation} style={[s.fab, { backgroundColor: surface, borderColor: border, right: 20, bottom: (selectedPin ? 220 : 100) + insets.bottom }]}>
+        <TouchableOpacity onPress={getLocation} style={[s.fab, { backgroundColor: surface, borderColor: border, right: 20, bottom: (selectedPin ? 220 : 100) + getBottomInset(insets.bottom) }]}>
           <Ionicons name="locate-outline" size={20} color={PRIMARY} />
         </TouchableOpacity>
       )}
@@ -235,7 +236,7 @@ export default function MapScreen() {
 
       {/* ── Pin detail card ── */}
       {selectedPin && (
-        <View style={[s.pinCard, { backgroundColor: surface, borderColor: border, bottom: insets.bottom }]}>
+        <View style={[s.pinCard, { backgroundColor: surface, borderColor: border, bottom: getBottomInset(insets.bottom) }]}>
           <View style={s.handle} />
           <View style={{ flexDirection: "row", alignItems: "flex-start", marginBottom: 12 }}>
             <View style={{ flex: 1 }}>

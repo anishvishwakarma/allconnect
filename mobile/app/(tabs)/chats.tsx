@@ -6,6 +6,7 @@ import {
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { getBottomInset } from "../../constants/config";
 import { useAuthStore } from "../../store/auth";
 import { chatsApi } from "../../services/api";
 import { useAppTheme } from "../../context/ThemeContext";
@@ -50,7 +51,7 @@ export default function ChatsScreen() {
 
   if (!token) {
     return (
-      <View style={[s.center, { backgroundColor: bg, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+      <View style={[s.center, { backgroundColor: bg, paddingTop: insets.top, paddingBottom: getBottomInset(insets.bottom) }]}>
         <Ionicons name="chatbubbles-outline" size={48} color={PRIMARY} />
         <Text style={[s.emptyTitle, { color: text }]}>Sign in for chats</Text>
         <Text style={[s.emptySub, { color: sub }]}>Group chats appear after your join request is approved</Text>
@@ -73,7 +74,7 @@ export default function ChatsScreen() {
         <FlatList
           data={groups}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: insets.bottom + 40 }}
+          contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: getBottomInset(insets.bottom) + 40 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={PRIMARY} />}
           ListEmptyComponent={
             <View style={[s.center, { paddingTop: 60 }]}>

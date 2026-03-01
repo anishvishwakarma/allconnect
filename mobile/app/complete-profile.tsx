@@ -16,6 +16,7 @@ import { useAuthStore } from "../store/auth";
 import { usersApi } from "../services/api";
 import { getInitials } from "../utils/profile";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { getBottomInset } from "../constants/config";
 import { useAppTheme } from "../context/ThemeContext";
 import { useAlert } from "../context/AlertContext";
 
@@ -96,7 +97,7 @@ export default function CompleteProfileScreen() {
   const initial = getInitials(name || user?.name);
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: bg }} contentContainerStyle={[s.content, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 48 }]} keyboardShouldPersistTaps="handled">
+    <ScrollView style={{ flex: 1, backgroundColor: bg }} contentContainerStyle={[s.content, { paddingTop: insets.top + 24, paddingBottom: getBottomInset(insets.bottom) + 48 }]} keyboardShouldPersistTaps="handled">
       <Text style={[s.title, { color: text }]}>Complete your profile</Text>
       <Text style={[s.subtitle, { color: sub }]}>Add your name, email and optional photo.</Text>
 

@@ -10,6 +10,7 @@ import { useAuthStore } from "../../store/auth";
 import { disconnectSocket } from "../../services/socket";
 import { getInitials } from "../../utils/profile";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { getBottomInset } from "../../constants/config";
 import { useAppTheme } from "../../context/ThemeContext";
 import { useAlert } from "../../context/AlertContext";
 
@@ -38,7 +39,7 @@ export default function ProfileScreen() {
 
   if (!token) {
     return (
-      <View style={[s.center, { backgroundColor: bg, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+      <View style={[s.center, { backgroundColor: bg, paddingTop: insets.top, paddingBottom: getBottomInset(insets.bottom) }]}>
         <View style={[s.bigAvatar, { backgroundColor: PRIMARY + "18" }]}>
           <Ionicons name="person-circle-outline" size={48} color={PRIMARY} />
         </View>
@@ -74,7 +75,7 @@ export default function ProfileScreen() {
   const initial = getInitials(user?.name);
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: bg }} contentContainerStyle={{ paddingBottom: insets.bottom + 48 }} showsVerticalScrollIndicator={false}>
+    <ScrollView style={{ flex: 1, backgroundColor: bg }} contentContainerStyle={{ paddingBottom: getBottomInset(insets.bottom) + 48 }} showsVerticalScrollIndicator={false}>
       {/* Header */}
       <View style={[s.header, { borderBottomColor: border, paddingTop: insets.top + 16 }]}>
         <Text style={[s.title, { color: text }]}>Profile</Text>

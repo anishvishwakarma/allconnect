@@ -18,7 +18,7 @@ import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAppTheme } from "../context/ThemeContext";
 import { useAlert } from "../context/AlertContext";
-import { API_URL } from "../constants/config";
+import { API_URL, getBottomInset } from "../constants/config";
 import { authApi } from "../services/api";
 import { useAuthStore } from "../store/auth";
 import {
@@ -122,6 +122,8 @@ export default function LoginScreen() {
           undefined,
           "error"
         );
+      else if (msg.includes("Verification failed") || msg.includes("Invalid or expired token"))
+        alert.show("Sign in failed", "Could not verify your account. Check your internet and try again.", undefined, "error");
       else if (msg.includes("timed out"))
         alert.show(
           "Taking too long",
@@ -136,7 +138,8 @@ export default function LoginScreen() {
           [{ text: "Cancel", style: "cancel" }, { text: "Retry", onPress: () => handleSignIn() }],
           "info"
         );
-      else alert.show("Sign in failed", "Something went wrong. Please try again.", undefined, "error");
+      else
+        alert.show("Sign in failed", msg || "Check your connection and try again.", undefined, "error");
     } finally {
       clearTimeout(hintTimer);
       setLoading(false);
@@ -198,6 +201,8 @@ export default function LoginScreen() {
         alert.show("Mobile in use", "This mobile number is already registered.", undefined, "error");
       else if (msg.includes("weak-password"))
         alert.show("Weak password", "Use at least 6 characters.", undefined, "info");
+      else if (msg.includes("Verification failed") || msg.includes("Invalid or expired token"))
+        alert.show("Registration failed", "Could not verify your account. Check your internet and try again.", undefined, "error");
       else if (msg.includes("Service temporarily unavailable") || msg.includes("Firebase not configured"))
         alert.show(
           "Server setup",
@@ -226,7 +231,10 @@ export default function LoginScreen() {
           [{ text: "Sign in", onPress: () => setMode("signin") }],
           "info"
         );
-      else alert.show("Something went wrong", "Please try again or contact support.", undefined, "error");
+      else if (msg.includes("Mobile number required"))
+        alert.show("Required", "Please enter a valid 10-digit mobile number.", undefined, "info");
+      else
+        alert.show("Something went wrong", msg || "Check your connection and try again.", undefined, "error");
     } finally {
       clearTimeout(hintTimer);
       setLoading(false);
@@ -269,7 +277,7 @@ export default function LoginScreen() {
   }
 
   return (
-    <View style={[s.root, { backgroundColor: bg, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+    <View style={[s.root, { backgroundColor: bg, paddingTop: insets.top, paddingBottom: getBottomInset(insets.bottom) }]}>
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -329,14 +337,16 @@ export default function LoginScreen() {
                     <Text style={[s.sectionSubtext, { color: subColor }]}>Linked to your email for messaging</Text>
                   </View>
                 </View>
-                <View style={[s.inputWrapper, { backgroundColor: inputBg, borderColor: normalizeMobile(mobile).length >= 13 ? PRIMARY : borderColor }]}>
+                <View style={[s.inputWrapper, { backgroundColor: inputBg, borderColor: normalizeMobile(mobile).length >= 13 ? PRIMARY : borderColor, flexDirection: "row", alignItems: "center" }]}>
+                  <Text style={[s.mobilePrefix, { color: subColor }]}>+91 </Text>
                   <TextInput
                     value={mobile}
-                    onChangeText={setMobile}
-                    placeholder="10-digit mobile number"
+                    onChangeText={(t) => setMobile(t.replace(/\D/g, "").slice(0, 10))}
+                    placeholder="10-digit number"
                     placeholderTextColor={isDark ? "#555" : "#C0C0C0"}
                     keyboardType="phone-pad"
-                    style={[s.input, { color: textColor }]}
+                    maxLength={10}
+                    style={[s.input, { color: textColor, flex: 1 }]}
                   />
                 </View>
               </>
@@ -541,6 +551,7 @@ const s = StyleSheet.create({
     paddingVertical: Platform.OS === "ios" ? 16 : 10,
   },
   input: { flex: 1, fontSize: 16, fontWeight: "500" },
+  mobilePrefix: { fontSize: 16, fontWeight: "600", marginRight: 2 },
   passwordToggle: { paddingLeft: 8 },
   forgotLink: { alignSelf: "flex-end", marginTop: 12 },
   linkText: { fontSize: 14, fontWeight: "600" },

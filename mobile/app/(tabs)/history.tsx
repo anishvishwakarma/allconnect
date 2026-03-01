@@ -6,6 +6,7 @@ import {
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { getBottomInset } from "../../constants/config";
 import { useAuthStore } from "../../store/auth";
 import { postsApi } from "../../services/api";
 import { useAppTheme } from "../../context/ThemeContext";
@@ -42,7 +43,7 @@ export default function HistoryScreen() {
 
   if (!token) {
     return (
-      <View style={[s.center, { backgroundColor: bg, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+      <View style={[s.center, { backgroundColor: bg, paddingTop: insets.top, paddingBottom: getBottomInset(insets.bottom) }]}>
         <Ionicons name="time-outline" size={48} color={PRIMARY} />
         <Text style={[s.emptyTitle, { color: text }]}>Sign in to see history</Text>
         <Text style={[s.emptySub, { color: sub }]}>Posts you created or joined will appear here</Text>
@@ -65,7 +66,7 @@ export default function HistoryScreen() {
         <FlatList
           data={items}
           keyExtractor={(item) => item.id + (item.role || "")}
-          contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: insets.bottom + 40 }}
+          contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: getBottomInset(insets.bottom) + 40 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={PRIMARY} />}
           ListEmptyComponent={
             <View style={[s.center, { paddingTop: 60 }]}>
