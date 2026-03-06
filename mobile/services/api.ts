@@ -1,4 +1,5 @@
 import { API_URL } from '../constants/config';
+import { disconnectSocket } from './socket';
 import { useAuthStore } from '../store/auth';
 import type { Post, JoinRequest, GroupChat, Message, User } from '../types';
 
@@ -7,9 +8,9 @@ const AUTH_TIMEOUT_MS = 45000; // Render cold start can take 30–60s
 
 async function request<T>(
   path: string,
-  options: RequestInit & { timeoutMs?: number } = {}
+  options: RequestInit & { timeoutMs?: number; logoutOn401?: boolean } = {}
 ): Promise<T> {
-  const { timeoutMs = DEFAULT_TIMEOUT_MS, ...fetchOptions } = options;
+  const { timeoutMs = DEFAULT_TIMEOUT_MS, logoutOn401 = true, ...fetchOptions } = options;
   const token = useAuthStore.getState().token;
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -51,7 +52,8 @@ async function request<T>(
   }
 
   if (!res.ok) {
-    if (res.status === 401) {
+    if (res.status === 401 && logoutOn401) {
+      disconnectSocket();
       useAuthStore.getState().logout();
     }
     // Don't clear token on 503 (server config) — user may retry
@@ -125,7 +127,7 @@ export const authApi = {
 // ── Users ────────────────────────────────────────────────
 export const usersApi = {
   me: () => request<User>('/api/users/me'),
-  update: (data: { name?: string; email?: string; avatar_uri?: string }) =>
+  update: (data: { name?: string; avatar_uri?: string }) =>
     request<User>('/api/users/me', { method: 'PATCH', body: JSON.stringify(data) }),
   uploadAvatar: (base64Image: string) =>
     request<{ avatar_uri: string }>('/api/users/avatar', {
@@ -137,8 +139,18 @@ export const usersApi = {
       method: 'POST',
       body: JSON.stringify({ token, platform }),
     }),
-  deleteAccount: () =>
-    request<{ success: boolean }>('/api/users/me', { method: 'DELETE' }),
+  unregisterPushToken: (token: string) =>
+    request<{ success: boolean }>('/api/users/push-token', {
+      method: 'DELETE',
+      body: JSON.stringify({ token }),
+    }),
+  deleteAccount: (firebaseIdToken: string) =>
+    request<{ success: boolean }>('/api/users/me', {
+      method: 'DELETE',
+      body: JSON.stringify({ firebase_id_token: firebaseIdToken }),
+      timeoutMs: AUTH_TIMEOUT_MS,
+      logoutOn401: false,
+    }),
 };
 
 // ── Posts ────────────────────────────────────────────────
@@ -174,7 +186,7 @@ export const postsApi = {
 // ── Join Requests ────────────────────────────────────────
 export const requestsApi = {
   send: (postId: string) =>
-    request<{ success: boolean }>(`/api/posts/${postId}/request`, {
+    request<{ success: boolean; status?: string; group_chat_id?: string | null }>(`/api/posts/${postId}/request`, {
       method: 'POST',
       body: JSON.stringify({}),
     }),

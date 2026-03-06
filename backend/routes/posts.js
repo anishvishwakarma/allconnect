@@ -4,6 +4,7 @@ const db = require('../db');
 const { authMiddleware } = require('../middleware/auth');
 
 const router = express.Router();
+const VALID_PRIVACY_TYPES = new Set(['public', 'approval']);
 
 function postRowToJson(r) {
   if (!r) return null;
@@ -21,6 +22,7 @@ function postRowToJson(r) {
     cost_per_person: r.cost_per_person != null ? parseFloat(r.cost_per_person) : null,
     max_people: r.max_people,
     status: r.status,
+    privacy_type: r.privacy_type,
     created_at: r.created_at,
   };
 }
@@ -126,35 +128,85 @@ router.post('/', authMiddleware, async (req, res) => {
     if (!title || category == null || lat == null || lng == null || !event_at || max_people == null) {
       return res.status(400).json({ error: 'Missing required fields: title, category, lat, lng, event_at, max_people' });
     }
+    const parsedMaxPeople = Number(max_people);
+    const parsedDuration = Number(duration_minutes) || 60;
+    const parsedCost = cost_per_person == null ? null : Number(cost_per_person);
+    const eventDate = new Date(event_at);
+    const normalizedPrivacyType = privacy_type == null || privacy_type === '' ? 'public' : String(privacy_type);
+    if (!Number.isInteger(parsedMaxPeople) || parsedMaxPeople <= 0) {
+      return res.status(400).json({ error: 'max_people must be a positive whole number' });
+    }
+    if (!Number.isInteger(parsedDuration) || parsedDuration <= 0) {
+      return res.status(400).json({ error: 'duration_minutes must be a positive whole number' });
+    }
+    if (Number.isNaN(eventDate.getTime()) || eventDate <= new Date()) {
+      return res.status(400).json({ error: 'event_at must be a valid future date/time' });
+    }
+    if (!VALID_PRIVACY_TYPES.has(normalizedPrivacyType)) {
+      return res.status(400).json({ error: 'privacy_type must be public or approval' });
+    }
+
     const id = uuidv4();
-    await db.query(
-      `INSERT INTO posts (id, host_id, title, description, category, lat, lng, address_text, event_at, duration_minutes, cost_per_person, max_people, status, privacy_type)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'open', $13)`,
-      [
-        id,
-        req.userId,
-        title,
-        description || null,
-        category,
-        lat,
-        lng,
-        address_text || null,
-        event_at,
-        duration_minutes,
-        cost_per_person ?? null,
-        max_people,
-        privacy_type || null,
-      ]
-    );
-    await db.query(
-      'INSERT INTO post_participations (post_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-      [id, req.userId]
-    );
-    await db.query(
-      'UPDATE users SET posts_this_month = posts_this_month + 1, updated_at = NOW() WHERE id = $1',
-      [req.userId]
-    );
-    const post = await db.row('SELECT * FROM posts WHERE id = $1', [id]);
+    const client = await db.pool.connect();
+    let post;
+    try {
+      await client.query('BEGIN');
+      const userResult = await client.query(
+        'SELECT posts_this_month, subscription_ends_at FROM users WHERE id = $1 FOR UPDATE',
+        [req.userId]
+      );
+      const user = userResult.rows[0];
+      if (!user) {
+        await client.query('ROLLBACK');
+        return res.status(401).json({ error: 'User not found' });
+      }
+      const hasSubscription = user.subscription_ends_at && new Date(user.subscription_ends_at) > new Date();
+      const countResult = await client.query(
+        `SELECT COUNT(*)::int AS count
+         FROM posts
+         WHERE host_id = $1
+           AND created_at >= date_trunc('month', NOW())
+           AND created_at < date_trunc('month', NOW()) + interval '1 month'`,
+        [req.userId]
+      );
+      const currentMonthPosts = countResult.rows[0]?.count ?? 0;
+      if (!hasSubscription && currentMonthPosts >= 5) {
+        await client.query('ROLLBACK');
+        return res.status(403).json({ error: 'Monthly free post limit reached' });
+      }
+
+      await client.query(
+        `INSERT INTO posts (id, host_id, title, description, category, lat, lng, address_text, event_at, duration_minutes, cost_per_person, max_people, status, privacy_type)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'open', $13)`,
+        [
+          id,
+          req.userId,
+          title,
+          description || null,
+          category,
+          lat,
+          lng,
+          address_text || null,
+          event_at,
+          parsedDuration,
+          parsedCost,
+          parsedMaxPeople,
+          normalizedPrivacyType,
+        ]
+      );
+      await client.query(
+        'INSERT INTO post_participations (post_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+        [id, req.userId]
+      );
+      const postResult = await client.query('SELECT * FROM posts WHERE id = $1', [id]);
+      post = postResult.rows[0];
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
     return res.status(201).json(postRowToJson(post));
   } catch (err) {
     console.error('posts/create', err);

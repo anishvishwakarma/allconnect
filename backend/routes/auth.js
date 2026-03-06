@@ -1,15 +1,17 @@
 const express = require('express');
+const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../db');
 const { signToken } = require('../middleware/auth');
 const { sendOtpSms } = require('../services/sms');
-const { rateLimitOtp } = require('../middleware/rateLimitOtp');
+const { rateLimitOtp, rateLimitOtpVerify } = require('../middleware/rateLimitOtp');
 const { rateLimitAuth } = require('../middleware/rateLimitAuth');
 const { verifyIdToken, isConfigured } = require('../services/firebase');
 
 const router = express.Router();
 const OTP_TTL_MINUTES = 10;
 const INDIA_MOBILE_LENGTH = 10;
+const OTP_SECRET = process.env.OTP_SECRET || process.env.JWT_SECRET || '';
 
 function normalizeMobile(mobile) {
   const digits = (mobile || '').replace(/\D/g, '');
@@ -17,6 +19,39 @@ function normalizeMobile(mobile) {
     return '+91' + digits.slice(-INDIA_MOBILE_LENGTH);
   }
   return null;
+}
+
+function hashOtp(mobile, code) {
+  return crypto.createHash('sha256').update(`${mobile}:${code}:${OTP_SECRET}`).digest('hex');
+}
+
+function safeEqual(a, b) {
+  const left = Buffer.from(a);
+  const right = Buffer.from(b);
+  return left.length === right.length && crypto.timingSafeEqual(left, right);
+}
+
+function maskEmail(email) {
+  if (!email || typeof email !== 'string' || !email.includes('@')) return '';
+  const [name, domain] = email.split('@');
+  const visible = name.slice(0, 2);
+  return `${visible}${'*'.repeat(Math.max(1, name.length - visible.length))}@${domain}`;
+}
+
+async function getUserForResponse(userId) {
+  return db.row(
+    `SELECT u.*,
+            (
+              SELECT COUNT(*)::int
+              FROM posts p
+              WHERE p.host_id = u.id
+                AND p.created_at >= date_trunc('month', NOW())
+                AND p.created_at < date_trunc('month', NOW()) + interval '1 month'
+            ) AS posts_this_month
+     FROM users u
+     WHERE u.id = $1`,
+    [userId]
+  );
 }
 
 function userRowToJson(r) {
@@ -45,7 +80,7 @@ router.post('/send-otp', rateLimitOtp, async (req, res) => {
     await db.query(
       `INSERT INTO otp_codes (mobile, code, expires_at) VALUES ($1, $2, $3)
        ON CONFLICT (mobile) DO UPDATE SET code = $2, expires_at = $3`,
-      [mobile, code, expiresAt]
+      [mobile, hashOtp(mobile, code), expiresAt]
     );
     await sendOtpSms(mobile, code);
     return res.json({ success: true });
@@ -56,7 +91,7 @@ router.post('/send-otp', rateLimitOtp, async (req, res) => {
 });
 
 // POST /api/auth/verify-otp
-router.post('/verify-otp', async (req, res) => {
+router.post('/verify-otp', rateLimitOtpVerify, async (req, res) => {
   try {
     const mobile = normalizeMobile(req.body?.mobile);
     const code = (req.body?.code || '').trim();
@@ -70,7 +105,7 @@ router.post('/verify-otp', async (req, res) => {
     if (!row || row.expires_at < new Date()) {
       return res.status(401).json({ error: 'OTP expired or invalid' });
     }
-    if (row.code !== code) {
+    if (!safeEqual(row.code, hashOtp(mobile, code))) {
       return res.status(401).json({ error: 'Incorrect OTP' });
     }
     await db.query('DELETE FROM otp_codes WHERE mobile = $1', [mobile]);
@@ -83,7 +118,7 @@ router.post('/verify-otp', async (req, res) => {
          VALUES ($1, $2, NULL, NULL, NULL, FALSE, 0, NULL)`,
         [id, mobile]
       );
-      user = await db.row('SELECT * FROM users WHERE id = $1', [id]);
+      user = await getUserForResponse(id);
     }
     const token = signToken({ userId: user.id });
     return res.json({ token, user: userRowToJson(user) });
@@ -100,7 +135,7 @@ router.get('/email-for-login', rateLimitAuth, async (req, res) => {
     if (!mobile) return res.status(400).json({ error: 'Valid mobile required' });
     const user = await db.row('SELECT email FROM users WHERE mobile = $1 AND email IS NOT NULL', [mobile]);
     if (!user || !user.email) return res.status(404).json({ error: 'No account found for this mobile' });
-    return res.json({ email: user.email });
+    return res.json({ email: maskEmail(user.email) });
   } catch (err) {
     console.error('email-for-login', err);
     return res.status(500).json({ error: 'Could not lookup account' });
@@ -119,13 +154,17 @@ router.post('/firebase', async (req, res) => {
       return res.status(503).json({ error: 'Service temporarily unavailable' });
     }
     const decoded = await verifyIdToken(idToken);
-    if (!decoded || !decoded.email) return res.status(401).json({ error: 'Invalid or expired token' });
+    if (!decoded || !decoded.email || !decoded.uid) return res.status(401).json({ error: 'Invalid or expired token' });
 
     const email = decoded.email.toLowerCase();
     const name = decoded.name || decoded.displayName || null;
     const mobilePlaceholder = 'email:' + email;
+    const firebaseUid = decoded.uid;
 
-    let user = await db.row('SELECT * FROM users WHERE email = $1 OR mobile = $2', [email, mobilePlaceholder]);
+    let user = await db.row(
+      'SELECT * FROM users WHERE firebase_uid = $1 OR email = $2 OR mobile = $3',
+      [firebaseUid, email, mobilePlaceholder]
+    );
     if (!user) {
       // New user — mobile is required at registration (sent from client)
       const storeMobile = mobile || mobilePlaceholder;
@@ -137,22 +176,36 @@ router.post('/firebase', async (req, res) => {
       if (existing) return res.status(400).json({ error: 'Mobile number already in use' });
       const id = uuidv4();
       await db.query(
-        `INSERT INTO users (id, mobile, name, email, avatar_uri, kyc_verified, posts_this_month, subscription_ends_at)
-         VALUES ($1, $2, $3, $4, NULL, FALSE, 0, NULL)`,
-        [id, storeMobile, name, email]
+        `INSERT INTO users (id, mobile, name, email, firebase_uid, avatar_uri, kyc_verified, posts_this_month, subscription_ends_at)
+         VALUES ($1, $2, $3, $4, $5, NULL, FALSE, 0, NULL)`,
+        [id, storeMobile, name, email, firebaseUid]
       );
-      user = await db.row('SELECT * FROM users WHERE id = $1', [id]);
+      user = await getUserForResponse(id);
     } else {
-      // Existing user — update mobile if provided and different from placeholder
+      const updates = [];
+      const values = [];
+      let i = 1;
       if (mobile && user.mobile === mobilePlaceholder) {
         const existing = await db.row('SELECT id FROM users WHERE mobile = $1', [mobile]);
         if (existing && existing.id !== user.id) return res.status(400).json({ error: 'Mobile number already in use' });
-        await db.query('UPDATE users SET mobile = $1, name = COALESCE(name, $2), updated_at = NOW() WHERE id = $3', [mobile, name, user.id]);
-        user = await db.row('SELECT * FROM users WHERE id = $1', [user.id]);
-      } else if (!user.email) {
-        await db.query('UPDATE users SET email = $1, name = COALESCE(name, $2), updated_at = NOW() WHERE id = $3', [email, name, user.id]);
-        user = await db.row('SELECT * FROM users WHERE id = $1', [user.id]);
+        updates.push(`mobile = $${i++}`);
+        values.push(mobile);
       }
+      if (!user.email) {
+        updates.push(`email = $${i++}`);
+        values.push(email);
+      }
+      if (!user.firebase_uid) {
+        updates.push(`firebase_uid = $${i++}`);
+        values.push(firebaseUid);
+      }
+      updates.push(`name = COALESCE(name, $${i++})`);
+      values.push(name);
+      if (updates.length) {
+        values.push(user.id);
+        await db.query(`UPDATE users SET ${updates.join(', ')}, updated_at = NOW() WHERE id = $${i}`, values);
+      }
+      user = await getUserForResponse(user.id);
     }
 
     const token = signToken({ userId: user.id });

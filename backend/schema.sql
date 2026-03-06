@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS users (
   mobile TEXT NOT NULL UNIQUE,
   name TEXT,
   email TEXT,
+  firebase_uid TEXT,
   avatar_uri TEXT,
   kyc_verified BOOLEAN DEFAULT FALSE,
   posts_this_month INT DEFAULT 0,
@@ -14,8 +15,11 @@ CREATE TABLE IF NOT EXISTS users (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+ALTER TABLE users ADD COLUMN IF NOT EXISTS firebase_uid TEXT;
 CREATE INDEX IF NOT EXISTS idx_users_mobile ON users(mobile);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email) WHERE email IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_unique ON users (LOWER(email)) WHERE email IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_firebase_uid_unique ON users(firebase_uid) WHERE firebase_uid IS NOT NULL;
 
 -- OTP codes (TTL ~10 min)
 CREATE TABLE IF NOT EXISTS otp_codes (
@@ -40,7 +44,7 @@ CREATE TABLE IF NOT EXISTS posts (
   cost_per_person NUMERIC(10,2),
   max_people INT NOT NULL,
   status TEXT NOT NULL DEFAULT 'open',
-  privacy_type TEXT,
+  privacy_type TEXT NOT NULL DEFAULT 'public' CHECK (privacy_type IN ('public', 'approval')),
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_posts_host ON posts(host_id);
@@ -106,3 +110,34 @@ CREATE TABLE IF NOT EXISTS device_tokens (
   UNIQUE(user_id, token)
 );
 CREATE INDEX IF NOT EXISTS idx_device_tokens_user ON device_tokens(user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_device_tokens_token ON device_tokens(token);
+
+DO $$
+BEGIN
+  BEGIN
+    UPDATE posts SET privacy_type = 'public' WHERE privacy_type IS NULL OR privacy_type NOT IN ('public', 'approval');
+  EXCEPTION WHEN undefined_table THEN
+    NULL;
+  END;
+  BEGIN
+    ALTER TABLE posts ALTER COLUMN privacy_type SET DEFAULT 'public';
+  EXCEPTION WHEN undefined_table THEN
+    NULL;
+  END;
+  BEGIN
+    ALTER TABLE posts ALTER COLUMN privacy_type SET NOT NULL;
+  EXCEPTION WHEN undefined_table THEN
+    NULL;
+  WHEN check_violation THEN
+    NULL;
+  END;
+  BEGIN
+    ALTER TABLE posts
+      ADD CONSTRAINT posts_privacy_type_check
+      CHECK (privacy_type IN ('public', 'approval'));
+  EXCEPTION WHEN duplicate_object THEN
+    NULL;
+  WHEN undefined_table THEN
+    NULL;
+  END;
+END $$;

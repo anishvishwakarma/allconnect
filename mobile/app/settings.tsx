@@ -19,6 +19,7 @@ import { disconnectSocket } from "../services/socket";
 import { usersApi } from "../services/api";
 import Constants from "expo-constants";
 import { useAlert } from "../context/AlertContext";
+import { getCurrentFirebaseIdToken } from "../services/firebaseAuth";
 
 const PRIMARY = "#E8751A";
 const APP_VERSION = Constants.expoConfig?.version ?? "1.0.0";
@@ -74,7 +75,7 @@ export default function SettingsScreen() {
           onPress: () => {
             alert.show(
               "Confirm deletion",
-              "Type DELETE to confirm permanent account deletion.",
+              "Tap the button below to permanently delete your account.",
               [
                 { text: "Cancel", style: "cancel" },
                 {
@@ -96,13 +97,23 @@ export default function SettingsScreen() {
     if (!token) return;
     setDeleting(true);
     try {
-      await usersApi.deleteAccount();
+      const firebaseIdToken = await getCurrentFirebaseIdToken();
+      if (!firebaseIdToken) {
+        alert.show("Sign in again", "Please sign in again before deleting your account.", undefined, "info");
+        return;
+      }
+      await usersApi.deleteAccount(firebaseIdToken);
       disconnectSocket();
       logout();
       router.replace("/login");
       alert.show("Account deleted", "Your account and data have been permanently deleted.", undefined, "success");
     } catch (err: any) {
-      alert.show("Something went wrong", "Could not delete account. Try again or contact support.", undefined, "error");
+      const message = err?.message || "";
+      if (message.includes("Re-authentication required")) {
+        alert.show("Sign in again", "For security, please sign in again and then retry account deletion.", undefined, "info");
+      } else {
+        alert.show("Something went wrong", "Could not delete account. Try again or contact support.", undefined, "error");
+      }
     } finally {
       setDeleting(false);
     }
@@ -177,13 +188,13 @@ export default function SettingsScreen() {
           <View style={s.row}>
             <Ionicons name="notifications-outline" size={20} color={sub} />
             <Text style={[s.rowLabel, { color: text }]}>Push notifications</Text>
-            <Text style={[s.hint, { color: sub }]}>Coming soon</Text>
+            <Text style={[s.hint, { color: sub }]}>Enabled on supported builds</Text>
           </View>
           <View style={[s.separator, { backgroundColor: border }]} />
           <View style={s.row}>
             <Ionicons name="chatbubble-outline" size={20} color={sub} />
             <Text style={[s.rowLabel, { color: text }]}>Chat alerts</Text>
-            <Text style={[s.hint, { color: sub }]}>Coming soon</Text>
+            <Text style={[s.hint, { color: sub }]}>On when permission is granted</Text>
           </View>
         </View>
       </View>
@@ -192,7 +203,7 @@ export default function SettingsScreen() {
         <Text style={[s.sectionTitle, { color: sub }]}>SUPPORT</Text>
         <View style={[s.card, { backgroundColor: surface, borderColor: border }]}>
           <TouchableOpacity
-            onPress={() => openUrl("https://allconnect.app/help", "Help")}
+            onPress={() => router.push("/help")}
             style={s.row}
           >
             <Ionicons name="help-circle-outline" size={20} color={sub} />
@@ -215,7 +226,7 @@ export default function SettingsScreen() {
         <Text style={[s.sectionTitle, { color: sub }]}>LEGAL</Text>
         <View style={[s.card, { backgroundColor: surface, borderColor: border }]}>
           <TouchableOpacity
-            onPress={() => openUrl("https://allconnect.app/privacy", "Privacy")}
+            onPress={() => router.push("/privacy")}
             style={s.row}
           >
             <Ionicons name="shield-checkmark-outline" size={20} color={sub} />
@@ -224,7 +235,7 @@ export default function SettingsScreen() {
           </TouchableOpacity>
           <View style={[s.separator, { backgroundColor: border }]} />
           <TouchableOpacity
-            onPress={() => openUrl("https://allconnect.app/terms", "Terms")}
+            onPress={() => router.push("/terms")}
             style={s.row}
           >
             <Ionicons name="document-text-outline" size={20} color={sub} />

@@ -26,6 +26,7 @@ export default function EditProfileScreen() {
   const insets = useSafeAreaInsets();
   const token = useAuthStore((s) => s.token);
   const user = useAuthStore((s) => s.user);
+  const hasHydrated = useAuthStore((s) => s.hasHydrated);
   const updateUser = useAuthStore((s) => s.updateUser);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -42,6 +43,7 @@ export default function EditProfileScreen() {
   const border = isDark ? "#2C2C2F" : "#E5E5EA";
 
   useEffect(() => {
+    if (!hasHydrated) return;
     if (!token) {
       router.replace("/login");
       return;
@@ -54,7 +56,7 @@ export default function EditProfileScreen() {
       setEmail(u.email || "");
       setAvatarUri(u.avatar_uri || null);
     }).catch(() => {});
-  }, [token]);
+  }, [hasHydrated, token, user?.name, user?.email, user?.avatar_uri]);
 
   async function pickImage() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -87,7 +89,6 @@ export default function EditProfileScreen() {
       }
       const u = await usersApi.update({
         name: name.trim() || undefined,
-        email: email.trim() || undefined,
         avatar_uri: avatarUrl ?? undefined,
       });
       updateUser({ ...u, avatar_uri: avatarUrl ?? (u as { avatar_uri?: string })?.avatar_uri });
@@ -95,7 +96,6 @@ export default function EditProfileScreen() {
       router.back();
     } catch (err: any) {
       alert.show("Something went wrong", "Could not save. Please try again.", undefined, "error");
-      router.back();
     } finally {
       setSaving(false);
     }
@@ -133,9 +133,7 @@ export default function EditProfileScreen() {
         placeholder="email@example.com"
         placeholderTextColor={sub}
         value={email}
-        onChangeText={setEmail}
-        keyboardType="email-address"
-        autoCapitalize="none"
+        editable={false}
         style={[s.input, { backgroundColor: surface, color: text, borderColor: border }]}
       />
       <TouchableOpacity onPress={save} disabled={saving} style={[s.btn, { backgroundColor: PRIMARY }]}>

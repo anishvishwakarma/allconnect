@@ -10,6 +10,24 @@ const firebase = {
   appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID || "",
 };
 
+const requiredEnv = [
+  ["EXPO_PUBLIC_GOOGLE_MAPS_API_KEY", mapsApiKey],
+  ["EXPO_PUBLIC_FIREBASE_API_KEY", firebase.apiKey],
+  ["EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN", firebase.authDomain],
+  ["EXPO_PUBLIC_FIREBASE_PROJECT_ID", firebase.projectId],
+  ["EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET", firebase.storageBucket],
+  ["EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID", firebase.messagingSenderId],
+  ["EXPO_PUBLIC_FIREBASE_APP_ID", firebase.appId],
+];
+
+const missingEnv = requiredEnv
+  .filter(([, value]) => !String(value || "").trim())
+  .map(([name]) => name);
+
+if (missingEnv.length > 0) {
+  throw new Error(`Missing required Expo env vars: ${missingEnv.join(", ")}`);
+}
+
 module.exports = {
   expo: {
     name: "AllConnect",
@@ -33,6 +51,7 @@ module.exports = {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.allconnect.app",
+      buildNumber: "1",
       config: { googleMapsApiKey: mapsApiKey },
     },
     android: {
@@ -41,10 +60,11 @@ module.exports = {
         backgroundColor: "#E8751A",
       },
       package: "com.allconnect.app",
+      versionCode: 1,
       config: {
         googleMaps: { apiKey: mapsApiKey },
       },
     },
-    plugins: ["expo-router", "expo-location", "expo-notifications"],
+    plugins: ["expo-router", "expo-location", "expo-notifications", "@react-native-community/datetimepicker"],
   },
 };

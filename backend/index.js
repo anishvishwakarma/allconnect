@@ -55,38 +55,78 @@ io.use((socket, next) => {
 });
 
 io.on('connection', (socket) => {
-  socket.on('chat:join', (groupId) => {
-    if (groupId) socket.join(`chat:${groupId}`);
+  socket.on('chat:join', async (groupId) => {
+    if (!groupId || !socket.userId) return;
+    try {
+      const member = await db.row(
+        `SELECT 1
+         FROM group_chat_members gcm
+         INNER JOIN group_chats gc ON gc.id = gcm.group_chat_id
+         WHERE gcm.group_chat_id = $1 AND gcm.user_id = $2 AND gc.expires_at > NOW()`,
+        [groupId, socket.userId]
+      );
+      if (member) socket.join(`chat:${groupId}`);
+    } catch (err) {
+      console.error('socket chat:join', err);
+    }
   });
   socket.on('chat:leave', (groupId) => {
     if (groupId) socket.leave(`chat:${groupId}`);
   });
-  socket.on('chat:typing', ({ chatId }) => {
-    if (chatId) socket.to(`chat:${chatId}`).emit('chat:typing');
+  socket.on('chat:typing', async ({ chatId }) => {
+    if (!chatId || !socket.userId) return;
+    try {
+      const member = await db.row(
+        `SELECT 1
+         FROM group_chat_members gcm
+         INNER JOIN group_chats gc ON gc.id = gcm.group_chat_id
+         WHERE gcm.group_chat_id = $1 AND gcm.user_id = $2 AND gc.expires_at > NOW()`,
+        [chatId, socket.userId]
+      );
+      if (member) socket.to(`chat:${chatId}`).emit('chat:typing');
+    } catch (err) {
+      console.error('socket chat:typing', err);
+    }
   });
-  socket.on('chat:stop_typing', ({ chatId }) => {
-    if (chatId) socket.to(`chat:${chatId}`).emit('chat:stop_typing');
+  socket.on('chat:stop_typing', async ({ chatId }) => {
+    if (!chatId || !socket.userId) return;
+    try {
+      const member = await db.row(
+        `SELECT 1
+         FROM group_chat_members gcm
+         INNER JOIN group_chats gc ON gc.id = gcm.group_chat_id
+         WHERE gcm.group_chat_id = $1 AND gcm.user_id = $2 AND gc.expires_at > NOW()`,
+        [chatId, socket.userId]
+      );
+      if (member) socket.to(`chat:${chatId}`).emit('chat:stop_typing');
+    } catch (err) {
+      console.error('socket chat:stop_typing', err);
+    }
   });
 });
 
-app.on('chat:new_message', async ({ groupId, message }) => {
-  io.to(`chat:${groupId}`).emit('new_message', message);
-  const senderId = message?.user_id;
-  if (senderId) {
-    const members = await db.rows(
-      'SELECT user_id FROM group_chat_members WHERE group_chat_id = $1 AND user_id != $2',
-      [groupId, senderId]
-    );
-    const userIds = (members || []).map((m) => m.user_id);
-    if (userIds.length) {
+app.on('chat:new_message', ({ groupId, message }) => {
+  void (async () => {
+    try {
+      io.to(`chat:${groupId}`).emit('new_message', message);
+      const senderId = message?.user_id;
+      if (!senderId) return;
+      const members = await db.rows(
+        'SELECT user_id FROM group_chat_members WHERE group_chat_id = $1 AND user_id != $2',
+        [groupId, senderId]
+      );
+      const userIds = (members || []).map((m) => m.user_id);
+      if (!userIds.length) return;
       const body = (message.body || '').slice(0, 80);
-      sendPushToUsers(userIds, {
+      await sendPushToUsers(userIds, {
         title: 'New message',
         body: body ? `${body}${body.length >= 80 ? '…' : ''}` : 'You have a new message',
         data: { type: 'chat_message', groupId },
-      }).catch((e) => console.error('Push on new_message:', e));
+      });
+    } catch (err) {
+      console.error('chat:new_message handler', err);
     }
-  }
+  })();
 });
 
 const PORT = process.env.PORT || 4000;

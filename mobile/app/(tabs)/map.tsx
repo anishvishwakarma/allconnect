@@ -30,7 +30,7 @@ const WHEN_FILTERS = [
 const CAT_COLORS: Record<string, string> = {
   activity: "#30D158", need: "#0A84FF", selling: "#FFD60A",
   meetup: "#BF5AF2", event: "#FF453A", study: "#32ADE6",
-  nightlife: "#E8751A", other: "#636366",
+  nightlife: "#E8751A", other: "#E8751A",
 };
 
 function formatEventTime(iso?: string | null): string {
@@ -62,6 +62,7 @@ export default function MapScreen() {
   const [reqDone, setReqDone] = useState(false);
   const regionRef = useRef(region);
   regionRef.current = region;
+  const regionFetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mapRef = useRef<MapView>(null);
 
   const fetchPins = useCallback(async () => {
@@ -82,7 +83,7 @@ export default function MapScreen() {
       params.from = sat.toISOString(); params.to = sun.toISOString();
     }
     try { setPins(await postsApi.nearby(latitude, longitude, 15, params)); }
-    catch { setPins([]); }
+    catch {}
     finally { setLoading(false); }
   }, [filter]);
 
@@ -92,6 +93,21 @@ export default function MapScreen() {
     const id = setInterval(fetchPins, AUTO_REFRESH_INTERVAL_MS);
     return () => clearInterval(id);
   }, [fetchPins]);
+
+  useEffect(() => {
+    return () => {
+      if (regionFetchTimeoutRef.current) clearTimeout(regionFetchTimeoutRef.current);
+    };
+  }, []);
+
+  function scheduleFetchForRegion(nextRegion: typeof region) {
+    setRegion(nextRegion);
+    if (regionFetchTimeoutRef.current) clearTimeout(regionFetchTimeoutRef.current);
+    regionFetchTimeoutRef.current = setTimeout(() => {
+      regionRef.current = nextRegion;
+      fetchPins();
+    }, 350);
+  }
 
   async function getLocation() {
     try {
@@ -107,7 +123,8 @@ export default function MapScreen() {
       }
       const loc = await Location.getCurrentPositionAsync({});
       const { latitude, longitude } = loc.coords;
-      setRegion((r) => ({ ...r, latitude, longitude }));
+      const nextRegion = { ...regionRef.current, latitude, longitude };
+      scheduleFetchForRegion(nextRegion);
       setUserLocation({ latitude, longitude });
       setLocationGranted(true);
     } catch (err: any) {
@@ -137,8 +154,11 @@ export default function MapScreen() {
     if (!selectedPin || !token) return;
     setReqLoading(true);
     try {
-      await requestsApi.send(selectedPin.id);
+      const result = await requestsApi.send(selectedPin.id);
       setReqDone(true);
+      if ((result as { status?: string } | undefined)?.status === "approved") {
+        alert.show("Joined", "You're in. Open the post details to access the group chat.", undefined, "success");
+      }
     } catch (err: any) {
       alert.show("Something went wrong", "Could not send your request. Please try again.", undefined, "error");
     } finally { setReqLoading(false); }
@@ -157,7 +177,7 @@ export default function MapScreen() {
         provider={PROVIDER_GOOGLE}
         style={StyleSheet.absoluteFillObject}
         region={region}
-        onRegionChangeComplete={setRegion}
+        onRegionChangeComplete={scheduleFetchForRegion}
         showsUserLocation={locationGranted}
         showsMyLocationButton={false}
       >
@@ -264,7 +284,11 @@ export default function MapScreen() {
           {reqDone ? (
             <View style={[s.successBanner, { backgroundColor: "#30D15818" }]}>
               <Ionicons name="checkmark-circle" size={18} color="#30D158" />
-              <Text style={{ color: "#30D158", fontWeight: "600", marginLeft: 8 }}>Request sent! Waiting for approval.</Text>
+              <Text style={{ color: "#30D158", fontWeight: "600", marginLeft: 8 }}>
+                {(selectedPin.privacy_type ?? selectedPin.privacyType) === "approval"
+                  ? "Request sent! Waiting for approval."
+                  : "Joined! Open details for the group chat."}
+              </Text>
             </View>
           ) : (
             <View style={{ flexDirection: "row", gap: 10 }}>
@@ -283,7 +307,9 @@ export default function MapScreen() {
                   {reqLoading ? <ActivityIndicator color="#fff" size="small" /> : (
                     <>
                       <Ionicons name="person-add-outline" size={16} color="#fff" style={{ marginRight: 6 }} />
-                      <Text style={s.primaryBtnText}>Request to Join</Text>
+                      <Text style={s.primaryBtnText}>
+                        {(selectedPin.privacy_type ?? selectedPin.privacyType) === "approval" ? "Request to Join" : "Join Now"}
+                      </Text>
                     </>
                   )}
                 </TouchableOpacity>

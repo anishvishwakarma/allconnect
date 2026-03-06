@@ -2,6 +2,7 @@ const express = require('express');
 const db = require('../db');
 const { authMiddleware } = require('../middleware/auth');
 const { uploadAvatar } = require('../services/storage');
+const { verifyIdToken, deleteUser } = require('../services/firebase');
 
 const router = express.Router();
 
@@ -19,12 +20,32 @@ function userRowToJson(r) {
   };
 }
 
+async function getUserForResponse(userId) {
+  return db.row(
+    `SELECT u.*,
+            (
+              SELECT COUNT(*)::int
+              FROM posts p
+              WHERE p.host_id = u.id
+                AND p.created_at >= date_trunc('month', NOW())
+                AND p.created_at < date_trunc('month', NOW()) + interval '1 month'
+            ) AS posts_this_month
+     FROM users u
+     WHERE u.id = $1`,
+    [userId]
+  );
+}
+
+function isExpoPushToken(token) {
+  return token.startsWith('ExponentPushToken[') || token.startsWith('ExpoPushToken[');
+}
+
 router.use(authMiddleware);
 
 // GET /api/users/me
 router.get('/me', async (req, res) => {
   try {
-    const user = await db.row('SELECT * FROM users WHERE id = $1', [req.userId]);
+    const user = await getUserForResponse(req.userId);
     if (!user) return res.status(401).json({ error: 'User not found' });
     return res.json(userRowToJson(user));
   } catch (err) {
@@ -66,6 +87,11 @@ router.post('/push-token', async (req, res) => {
     const token = (req.body?.token || '').trim();
     const platform = (req.body?.platform || 'unknown').trim();
     if (!token) return res.status(400).json({ error: 'token required' });
+    if (!isExpoPushToken(token)) return res.status(400).json({ error: 'invalid push token' });
+    await db.query(
+      'DELETE FROM device_tokens WHERE token = $1 AND user_id != $2',
+      [token, req.userId]
+    );
     await db.query(
       `INSERT INTO device_tokens (user_id, token, platform)
        VALUES ($1, $2, $3)
@@ -79,10 +105,23 @@ router.post('/push-token', async (req, res) => {
   }
 });
 
+// DELETE /api/users/push-token — unregister Expo push token
+router.delete('/push-token', async (req, res) => {
+  try {
+    const token = (req.body?.token || '').trim();
+    if (!token) return res.status(400).json({ error: 'token required' });
+    await db.query('DELETE FROM device_tokens WHERE user_id = $1 AND token = $2', [req.userId, token]);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('users/push-token delete', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // PATCH /api/users/me
 router.patch('/me', async (req, res) => {
   try {
-    const { name, email, avatar_uri } = req.body || {};
+    const { name, avatar_uri } = req.body || {};
     const updates = [];
     const values = [];
     let i = 1;
@@ -90,16 +129,12 @@ router.patch('/me', async (req, res) => {
       updates.push(`name = $${i++}`);
       values.push(name === '' ? null : name);
     }
-    if (email !== undefined) {
-      updates.push(`email = $${i++}`);
-      values.push(email === '' ? null : email);
-    }
     if (avatar_uri !== undefined) {
       updates.push(`avatar_uri = $${i++}`);
       values.push(avatar_uri === '' ? null : avatar_uri);
     }
     if (updates.length === 0) {
-      const user = await db.row('SELECT * FROM users WHERE id = $1', [req.userId]);
+      const user = await getUserForResponse(req.userId);
       return res.json(userRowToJson(user));
     }
     updates.push('updated_at = NOW()');
@@ -108,7 +143,7 @@ router.patch('/me', async (req, res) => {
       `UPDATE users SET ${updates.join(', ')} WHERE id = $${i}`,
       values
     );
-    const user = await db.row('SELECT * FROM users WHERE id = $1', [req.userId]);
+    const user = await getUserForResponse(req.userId);
     return res.json(userRowToJson(user));
   } catch (err) {
     console.error('users/me patch', err);
@@ -120,9 +155,35 @@ router.patch('/me', async (req, res) => {
 router.delete('/me', async (req, res) => {
   try {
     const userId = req.userId;
-    const user = await db.row('SELECT id FROM users WHERE id = $1', [userId]);
+    const user = await db.row('SELECT id, firebase_uid FROM users WHERE id = $1', [userId]);
     if (!user) return res.status(401).json({ error: 'User not found' });
-    await db.query('DELETE FROM users WHERE id = $1', [userId]);
+    const firebaseIdToken = (req.body?.firebase_id_token || '').trim();
+    if (!firebaseIdToken) {
+      return res.status(400).json({ error: 'firebase_id_token required' });
+    }
+    const decoded = await verifyIdToken(firebaseIdToken);
+    if (!decoded?.uid) {
+      return res.status(401).json({ error: 'Re-authentication required before account deletion' });
+    }
+    if (!user.firebase_uid || user.firebase_uid !== decoded.uid) {
+      return res.status(403).json({ error: 'This token does not match the signed-in account' });
+    }
+    const deletedFromFirebase = await deleteUser(decoded.uid);
+    if (!deletedFromFirebase) {
+      return res.status(503).json({ error: 'Could not delete authentication account right now' });
+    }
+
+    const client = await db.pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('DELETE FROM users WHERE id = $1', [userId]);
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
     return res.json({ success: true });
   } catch (err) {
     console.error('users/me delete', err);

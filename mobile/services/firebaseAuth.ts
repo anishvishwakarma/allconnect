@@ -3,6 +3,7 @@
  * Config is read from app.config.js extra (baked in at build time) so EAS builds get it from secrets.
  */
 import Constants from 'expo-constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import {
   createUserWithEmailAndPassword,
@@ -10,10 +11,16 @@ import {
   sendEmailVerification,
   sendPasswordResetEmail,
   getAuth,
+  initializeAuth,
+  signOut,
   Auth,
   User,
   UserCredential,
 } from 'firebase/auth';
+
+const { getReactNativePersistence } = require('@firebase/auth') as {
+  getReactNativePersistence: (storage: typeof AsyncStorage) => unknown;
+};
 
 function getFirebaseConfig() {
   const extra = Constants.expoConfig?.extra as { firebase?: Record<string, string> } | undefined;
@@ -47,7 +54,13 @@ function getFirebaseApp(): FirebaseApp {
 export function getFirebaseAuthInstance(): Auth {
   if (auth) return auth;
   const firebaseApp = getFirebaseApp();
-  auth = getAuth(firebaseApp);
+  try {
+    auth = initializeAuth(firebaseApp, {
+      persistence: getReactNativePersistence(AsyncStorage) as never,
+    });
+  } catch {
+    auth = getAuth(firebaseApp);
+  }
   return auth;
 }
 
@@ -67,7 +80,23 @@ export async function getIdToken(user: User): Promise<string> {
   return user.getIdToken(true);
 }
 
+export function getCurrentFirebaseUser(): User | null {
+  return getFirebaseAuthInstance().currentUser;
+}
+
+export async function getCurrentFirebaseIdToken(): Promise<string | null> {
+  const user = getCurrentFirebaseUser();
+  if (!user) return null;
+  return user.getIdToken(true);
+}
+
 export async function sendPasswordReset(email: string): Promise<void> {
   const auth = getFirebaseAuthInstance();
   await sendPasswordResetEmail(auth, email.trim().toLowerCase());
+}
+
+export async function signOutFirebase(): Promise<void> {
+  try {
+    await signOut(getFirebaseAuthInstance());
+  } catch {}
 }

@@ -39,6 +39,7 @@ export default function PostDetailScreen() {
   const border = isDark ? "#2C2C2F" : "#E5E5EA";
 
   const isHost = (post?.host_id ?? post?.hostId) === user?.id;
+  const requiresApproval = (post?.privacy_type ?? post?.privacyType) === "approval";
 
   useEffect(() => { if (id) load(); }, [id]);
 
@@ -74,10 +75,15 @@ export default function PostDetailScreen() {
   async function handleJoin() {
     setActionId("join");
     try {
-      await requestsApi.send(id);
+      const result = await requestsApi.send(id);
       const myReq = await requestsApi.myRequest(id);
       setMyRequest(myReq ?? null);
-      alert.show("Request sent", "The host will review your request soon.", undefined, "success");
+      if ((result as { status?: string } | undefined)?.status === "approved") {
+        await load();
+        alert.show("Joined", "You're in. Open the group chat to start talking.", undefined, "success");
+      } else {
+        alert.show("Request sent", "The host will review your request soon.", undefined, "success");
+      }
     } catch (err: any) { alert.show("Something went wrong", "Could not send your request. Please try again.", undefined, "error"); }
     finally { setActionId(null); }
   }
@@ -225,7 +231,7 @@ export default function PostDetailScreen() {
                 <StatusPill status={myRequest.status} large />
                 <Text style={[s.myReqText, { color: sub }]}>
                   {myRequest.status === "pending" && "Your request is waiting for host approval"}
-                  {myRequest.status === "approved" && "You're in! Open the group chat above"}
+                  {myRequest.status === "approved" && (requiresApproval ? "You're in! Open the group chat above" : "You joined successfully. Open the group chat above")}
                   {myRequest.status === "rejected" && "The host didn't accept your request this time"}
                 </Text>
               </View>
@@ -234,7 +240,7 @@ export default function PostDetailScreen() {
                 {actionId === "join" ? <ActivityIndicator color="#fff" /> : (
                   <>
                     <Ionicons name="person-add-outline" size={18} color="#fff" style={{ marginRight: 8 }} />
-                    <Text style={s.joinBtnText}>Request to Join</Text>
+                    <Text style={s.joinBtnText}>{requiresApproval ? "Request to Join" : "Join Now"}</Text>
                   </>
                 )}
               </TouchableOpacity>

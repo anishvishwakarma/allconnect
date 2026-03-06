@@ -24,7 +24,7 @@ const PRIMARY = "#E8751A";
 
 export default function CompleteProfileScreen() {
   const insets = useSafeAreaInsets();
-  const { token, user, updateUser } = useAuthStore();
+  const { token, user, updateUser, hasHydrated } = useAuthStore();
   const { isDark } = useAppTheme();
   const alert = useAlert();
   const [name, setName] = useState(user?.name?.trim() || "");
@@ -32,6 +32,10 @@ export default function CompleteProfileScreen() {
   const [avatarUri, setAvatarUri] = useState<string | null>(user?.avatar_uri || null);
   const [avatarBase64, setAvatarBase64] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  if (!hasHydrated) {
+    return null;
+  }
 
   if (!token) {
     router.replace("/login");
@@ -79,7 +83,6 @@ export default function CompleteProfileScreen() {
       }
       const u = await usersApi.update({
         name: trimmedName,
-        email: email.trim() || undefined,
         avatar_uri: finalAvatarUri ?? undefined,
       });
       updateUser({
@@ -99,7 +102,7 @@ export default function CompleteProfileScreen() {
   return (
     <ScrollView style={{ flex: 1, backgroundColor: bg }} contentContainerStyle={[s.content, { paddingTop: insets.top + 24, paddingBottom: getBottomInset(insets.bottom) + 48 }]} keyboardShouldPersistTaps="handled">
       <Text style={[s.title, { color: text }]}>Complete your profile</Text>
-      <Text style={[s.subtitle, { color: sub }]}>Add your name, email and optional photo.</Text>
+      <Text style={[s.subtitle, { color: sub }]}>Add your name and optional photo.</Text>
 
       <TouchableOpacity onPress={pickImage} style={[s.avatarWrap, { borderColor: border, backgroundColor: surface }]}>
         {avatarUri ? (
@@ -124,14 +127,12 @@ export default function CompleteProfileScreen() {
         maxLength={60}
       />
 
-      <Text style={[s.label, { color: sub }]}>Email (optional)</Text>
+      <Text style={[s.label, { color: sub }]}>Email</Text>
       <TextInput
         value={email}
-        onChangeText={setEmail}
+        editable={false}
         placeholder="your@email.com"
         placeholderTextColor={sub}
-        keyboardType="email-address"
-        autoCapitalize="none"
         style={[s.input, { backgroundColor: surface, color: text, borderColor: border }]}
       />
 

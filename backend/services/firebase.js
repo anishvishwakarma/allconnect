@@ -50,8 +50,20 @@ async function verifyIdToken(idToken) {
   }
 }
 
+async function deleteUser(uid) {
+  const a = getAdmin();
+  if (!a || !uid) return false;
+  try {
+    await a.auth().deleteUser(uid);
+    return true;
+  } catch (e) {
+    console.error('[Firebase] deleteUser:', e.message);
+    return false;
+  }
+}
+
 function isConfigured() {
   return getAdmin() !== null;
 }
 
-module.exports = { getAdmin, verifyIdToken, isConfigured };
+module.exports = { getAdmin, verifyIdToken, deleteUser, isConfigured };

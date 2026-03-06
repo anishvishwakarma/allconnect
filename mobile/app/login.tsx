@@ -45,6 +45,9 @@ function normalizeMobile(input: string): string {
 
 export default function LoginScreen() {
   const setAuth = useAuthStore((s) => s.setAuth);
+  const token = useAuthStore((s) => s.token);
+  const user = useAuthStore((s) => s.user);
+  const hasHydrated = useAuthStore((s) => s.hasHydrated);
   const insets = useSafeAreaInsets();
   const { isDark } = useAppTheme();
   const alert = useAlert();
@@ -64,6 +67,11 @@ export default function LoginScreen() {
       .catch(() => {})
       .finally(() => clearTimeout(t));
   }, []);
+
+  useEffect(() => {
+    if (!hasHydrated || !token) return;
+    router.replace(user?.name?.trim() ? "/(tabs)/map" : "/complete-profile");
+  }, [hasHydrated, token, user?.name]);
 
   const bg = isDark ? "#0C0C0F" : "#FAFAFA";
   const surface = isDark ? "#1A1A1F" : "#FFFFFF";
@@ -495,7 +503,7 @@ const s = StyleSheet.create({
   root: { flex: 1 },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: "center",
+    justifyContent: "flex-start",
     paddingHorizontal: 24,
   },
   brandArea: { alignItems: "center", marginBottom: 32 },

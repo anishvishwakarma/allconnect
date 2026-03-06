@@ -1,5 +1,4 @@
-import { useEffect } from "react";
-import { Tabs, router } from "expo-router";
+import { Tabs } from "expo-router";
 import { View, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -11,12 +10,10 @@ const PRIMARY = "#E8751A";
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
-  const token = useAuthStore((s) => s.token);
+  const hasHydrated = useAuthStore((s) => s.hasHydrated);
   const { isDark } = useAppTheme();
 
-  useEffect(() => {
-    if (!token) router.replace("/login");
-  }, [token]);
+  if (!hasHydrated) return null;
   const bg = isDark ? "#0C0C0F" : "#FFFFFF";
   const border = isDark ? "#1E1E21" : "#E5E5EA";
   const inactive = isDark ? "#505055" : "#AEAEB2";

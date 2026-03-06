@@ -4,6 +4,7 @@ import {
   ActivityIndicator, KeyboardAvoidingView, Platform,
   Switch, StyleSheet,
 } from "react-native";
+import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import * as Location from "expo-location";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -26,6 +27,7 @@ export default function CreatePostScreen() {
   const insets = useSafeAreaInsets();
   const token = useAuthStore((s) => s.token);
   const user = useAuthStore((s) => s.user);
+  const updateUser = useAuthStore((s) => s.updateUser);
   const { isDark } = useAppTheme();
   const alert = useAlert();
 
@@ -33,7 +35,7 @@ export default function CreatePostScreen() {
   const [category, setCategory] = useState("");
   const [description, setDescription] = useState("");
   const [addressText, setAddressText] = useState("");
-  const [eventAt, setEventAt] = useState("");
+  const [eventAt, setEventAt] = useState<Date | null>(null);
   const [durationMinutes, setDurationMinutes] = useState("60");
   const [costPerPerson, setCostPerPerson] = useState("0");
   const [maxParticipants, setMaxParticipants] = useState("4");
@@ -42,6 +44,8 @@ export default function CreatePostScreen() {
   const [lng, setLng] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [fetchingLoc, setFetchingLoc] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
 
   const bg = isDark ? "#0C0C0F" : "#F5F5F7";
   const surface = isDark ? "#1A1A1F" : "#FFFFFF";
@@ -54,6 +58,60 @@ export default function CreatePostScreen() {
   const subEnd = user?.subscription_ends_at;
   const freeRemaining = Math.max(0, 5 - postsMonth);
   const hasSubscription = subEnd && new Date(subEnd) > new Date();
+
+  function formatEventDate(value: Date | null) {
+    if (!value) return "Choose date";
+    return value.toLocaleDateString(undefined, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  }
+
+  function formatEventTime(value: Date | null) {
+    if (!value) return "Choose time";
+    return value.toLocaleTimeString(undefined, {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  function openDatePicker() {
+    setShowDatePicker(true);
+  }
+
+  function openTimePicker() {
+    if (!eventAt) {
+      alert.show("Choose date first", "Select the event date before choosing the time.", undefined, "info");
+      return;
+    }
+    setShowTimePicker(true);
+  }
+
+  function handleDateChange(event: DateTimePickerEvent, selectedDate?: Date) {
+    if (Platform.OS === "android") setShowDatePicker(false);
+    if (event.type === "dismissed" || !selectedDate) return;
+
+    const base = eventAt ?? new Date();
+    const next = new Date(selectedDate);
+    next.setHours(base.getHours(), base.getMinutes(), 0, 0);
+    setEventAt(next);
+
+    if (Platform.OS === "android") {
+      setShowTimePicker(true);
+    }
+  }
+
+  function handleTimeChange(event: DateTimePickerEvent, selectedTime?: Date) {
+    if (Platform.OS === "android") setShowTimePicker(false);
+    if (event.type === "dismissed" || !selectedTime) return;
+
+    const base = eventAt ?? new Date();
+    const next = new Date(base);
+    next.setHours(selectedTime.getHours(), selectedTime.getMinutes(), 0, 0);
+    setEventAt(next);
+  }
 
   if (!token) {
     return (
@@ -99,8 +157,18 @@ export default function CreatePostScreen() {
     if (lat == null || lng == null) { alert.show("Required", "Set your location.", undefined, "info"); return; }
     if (!eventAt) { alert.show("Required", "Set the event date and time.", undefined, "info"); return; }
     const eventDate = new Date(eventAt);
-    if (isNaN(eventDate.getTime())) { alert.show("Invalid", "Use format: 2026-03-15T20:00", undefined, "info"); return; }
+    if (isNaN(eventDate.getTime())) { alert.show("Invalid", "Choose a valid date and time.", undefined, "info"); return; }
     if (eventDate < new Date()) { alert.show("Invalid", "Event must be in the future.", undefined, "info"); return; }
+    const maxPeople = Number(maxParticipants);
+    if (!Number.isInteger(maxPeople) || maxPeople <= 0) {
+      alert.show("Invalid", "Enter a valid number of participants.", undefined, "info");
+      return;
+    }
+    const duration = Number(durationMinutes) || 60;
+    if (!Number.isInteger(duration) || duration <= 0) {
+      alert.show("Invalid", "Enter a valid duration in minutes.", undefined, "info");
+      return;
+    }
     if (!hasSubscription && freeRemaining <= 0) {
       alert.show("Limit reached", "You've used your 5 free posts this month. Upgrade to Pro for unlimited posts.", undefined, "info");
       return;
@@ -115,11 +183,14 @@ export default function CreatePostScreen() {
         lng,
         address_text: addressText.trim() || undefined,
         event_at: eventDate.toISOString(),
-        duration_minutes: Number(durationMinutes) || 60,
+        duration_minutes: duration,
         cost_per_person: Number(costPerPerson) || 0,
-        max_people: Number(maxParticipants),
+        max_people: maxPeople,
         privacy_type: approvalRequired ? "approval" : "public",
       });
+      if (!hasSubscription) {
+        updateUser({ posts_this_month: (user?.posts_this_month ?? 0) + 1 });
+      }
       alert.show("Posted!", "Your post is live on the map.", [
         { text: "View Post", onPress: () => router.push(`/post/${post.id}`) },
         { text: "Explore Map", onPress: () => router.replace("/(tabs)/map") },
@@ -208,28 +279,64 @@ export default function CreatePostScreen() {
           </TouchableOpacity>
         </Section>
 
-        {/* Date/Time + Duration in one row */}
-        <View style={{ flexDirection: "row", gap: 12 }}>
-          <View style={{ flex: 2 }}>
-            <Section label="Date & Time" icon="calendar-outline" iconColor={PRIMARY} required compact>
-              <TextInput
-                value={eventAt} onChangeText={setEventAt}
-                placeholder="2026-03-15T20:00"
-                placeholderTextColor={sub}
-                style={[s.input, { backgroundColor: inputBg, color: text, borderColor: eventAt ? PRIMARY : border }]}
-              />
-            </Section>
+        {/* Date/Time */}
+        <Section label="Date & Time" icon="calendar-outline" iconColor={PRIMARY} required compact>
+          <Text style={[s.helperText, { color: sub }]}>Tap date, then choose time.</Text>
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            <TouchableOpacity
+              onPress={openDatePicker}
+              style={[s.pickerInput, { backgroundColor: inputBg, borderColor: eventAt ? PRIMARY : border }]}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="calendar-outline" size={16} color={PRIMARY} />
+              <View style={{ flex: 1, marginLeft: 10 }}>
+                <Text style={[s.pickerLabel, { color: sub }]}>Date</Text>
+                <Text style={[s.pickerValue, { color: text }]} numberOfLines={1}>{formatEventDate(eventAt)}</Text>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={openTimePicker}
+              style={[s.pickerInput, { backgroundColor: inputBg, borderColor: eventAt ? PRIMARY : border }]}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="time-outline" size={16} color={PRIMARY} />
+              <View style={{ flex: 1, marginLeft: 10 }}>
+                <Text style={[s.pickerLabel, { color: sub }]}>Time</Text>
+                <Text style={[s.pickerValue, { color: text }]} numberOfLines={1}>{formatEventTime(eventAt)}</Text>
+              </View>
+            </TouchableOpacity>
           </View>
-          <View style={{ flex: 1 }}>
-            <Section label="Duration (min)" icon="hourglass-outline" iconColor={sub} compact>
-              <TextInput
-                value={durationMinutes} onChangeText={setDurationMinutes}
-                keyboardType="number-pad" placeholder="60" placeholderTextColor={sub}
-                style={[s.input, { backgroundColor: inputBg, color: text, borderColor: border }]}
+          {showDatePicker && (
+            <View style={[s.pickerPanel, { borderColor: border, backgroundColor: surface }]}>
+              <DateTimePicker
+                value={eventAt ?? new Date()}
+                mode="date"
+                display={Platform.OS === "ios" ? "inline" : "default"}
+                minimumDate={new Date()}
+                onChange={handleDateChange}
               />
-            </Section>
-          </View>
-        </View>
+            </View>
+          )}
+          {showTimePicker && (
+            <View style={[s.pickerPanel, { borderColor: border, backgroundColor: surface }]}>
+              <DateTimePicker
+                value={eventAt ?? new Date()}
+                mode="time"
+                display={Platform.OS === "ios" ? "spinner" : "default"}
+                onChange={handleTimeChange}
+              />
+            </View>
+          )}
+        </Section>
+
+        {/* Duration */}
+        <Section label="Duration (min)" icon="hourglass-outline" iconColor={sub} compact>
+          <TextInput
+            value={durationMinutes} onChangeText={setDurationMinutes}
+            keyboardType="number-pad" placeholder="60" placeholderTextColor={sub}
+            style={[s.input, { backgroundColor: inputBg, color: text, borderColor: border }]}
+          />
+        </Section>
 
         {/* Cost + Max participants */}
         <View style={{ flexDirection: "row", gap: 12 }}>
@@ -308,7 +415,20 @@ const s = StyleSheet.create({
   limitBadge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
   limitText: { fontSize: 11, fontWeight: "700" },
   sLabel: { fontSize: 12, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.4 },
+  helperText: { fontSize: 12, marginBottom: 10 },
   input: { borderWidth: 1.5, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, fontSize: 15 },
+  pickerInput: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1.5,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  pickerLabel: { fontSize: 11, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 2 },
+  pickerValue: { fontSize: 14, fontWeight: "600" },
+  pickerPanel: { marginTop: 10, borderWidth: 1, borderRadius: 16, overflow: "hidden" },
   textarea: { minHeight: 88, textAlignVertical: "top" },
   catChip: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1.5 },
   catDot: { width: 8, height: 8, borderRadius: 4 },

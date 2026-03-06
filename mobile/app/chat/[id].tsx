@@ -42,39 +42,59 @@ export default function ChatScreen() {
   const theirMsgBg = isDark ? "#252528" : "#FFFFFF";
 
   useEffect(() => {
-    if (!token) return;
+    if (!token) {
+      setLoading(false);
+      router.replace("/login");
+      return;
+    }
     if (!id) { setLoading(false); return; }
-    loadMessages();
     const socket = getSocket();
-    joinChatRoom(id);
-
-    socket.on("new_message", (msg: { id: string; user_id: string; body: string; created_at: string }) => {
-      setMessages((p) => [...p, { id: msg.id, user_id: msg.user_id, body: msg.body, created_at: msg.created_at }]);
+    let isMounted = true;
+    const handleNewMessage = (msg: { id: string; user_id: string; user_name?: string | null; body: string; created_at: string }) => {
+      setMessages((p) => {
+        const exists = p.some((m) => m.id === msg.id);
+        if (exists) return p;
+        return [...p, { id: msg.id, user_id: msg.user_id, user_name: msg.user_name, body: msg.body, created_at: msg.created_at }];
+      });
       setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 80);
-    });
-    socket.on("chat:typing", () => setTyping(true));
-    socket.on("chat:stop_typing", () => setTyping(false));
-    socket.on("chat:expired", () => {
+    };
+    const handleExpired = () => {
       setExpired(true);
       alert.show("Chat ended", "This event has ended and the group has been closed.", undefined, "info");
+    };
+
+    loadMessages().then((canJoin) => {
+      if (!isMounted || !canJoin) return;
+      joinChatRoom(id);
+      socket.on("new_message", handleNewMessage);
+      socket.on("chat:typing", () => setTyping(true));
+      socket.on("chat:stop_typing", () => setTyping(false));
+      socket.on("chat:expired", handleExpired);
     });
 
     return () => {
+      isMounted = false;
       leaveChatRoom(id);
-      socket.off("new_message");
+      socket.off("new_message", handleNewMessage);
       socket.off("chat:typing");
       socket.off("chat:stop_typing");
-      socket.off("chat:expired");
+      socket.off("chat:expired", handleExpired);
     };
   }, [id, token]);
 
-  async function loadMessages() {
+  async function loadMessages(): Promise<boolean> {
     try {
       const msgs = await chatsApi.messages(id);
       setMessages(msgs);
       setTimeout(() => flatRef.current?.scrollToEnd({ animated: false }), 80);
+      return true;
     } catch (err: any) {
       if (err.message?.includes("expired")) setExpired(true);
+      if (err.message?.includes("Not a member")) {
+        alert.show("Access denied", "You are not a member of this chat.", undefined, "info");
+        router.back();
+      }
+      return false;
     } finally { setLoading(false); }
   }
 
@@ -97,7 +117,7 @@ export default function ChatScreen() {
       setMessages((p) => {
         const exists = p.some((m) => m.id === msg.id);
         if (exists) return p;
-        return [...p, { id: msg.id, user_id: msg.user_id, body: msg.body, created_at: msg.created_at }];
+        return [...p, { id: msg.id, user_id: msg.user_id, user_name: msg.user_name, body: msg.body, created_at: msg.created_at }];
       });
       setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 80);
     } catch (_) {
@@ -111,15 +131,17 @@ export default function ChatScreen() {
     const showName = !isMe && (!prev || prev.user_id !== item.user_id);
     const body = item.body ?? item.text;
     const createdAt = item.created_at ?? item.createdAt;
+    const senderName = item.user_name?.trim() || "User";
+    const senderInitial = senderName.charAt(0).toUpperCase() || "U";
     return (
       <View style={[msgS.row, isMe && msgS.myRow]}>
         {!isMe && (
           <View style={[msgS.avatar, showName ? { opacity: 1 } : { opacity: 0 }]}>
-            <Text style={msgS.avatarText}>U</Text>
+            <Text style={msgS.avatarText}>{senderInitial}</Text>
           </View>
         )}
         <View style={[msgS.bubble, isMe ? [msgS.myBubble, { backgroundColor: myMsgBg }] : [msgS.theirBubble, { backgroundColor: theirMsgBg, borderColor: border }]]}>
-          {showName && <Text style={[msgS.senderName, { color: PRIMARY }]}>User</Text>}
+          {showName && <Text style={[msgS.senderName, { color: PRIMARY }]}>{senderName}</Text>}
           <Text style={[msgS.msgText, { color: isMe ? "#fff" : text }]}>{body}</Text>
           <Text style={[msgS.time, { color: isMe ? "rgba(255,255,255,0.6)" : sub }]}>
             {new Date(createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}

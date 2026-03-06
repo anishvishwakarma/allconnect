@@ -37,6 +37,11 @@ export default function ProfileScreen() {
     usersApi.me().then((u) => { updateUser(u); setName(u.name || ""); setEmail(u.email || ""); }).catch(() => {});
   }, [token]);
 
+  useEffect(() => {
+    setName(user?.name || "");
+    setEmail(user?.email || "");
+  }, [user?.name, user?.email]);
+
   if (!token) {
     return (
       <View style={[s.center, { backgroundColor: bg, paddingTop: insets.top, paddingBottom: getBottomInset(insets.bottom) }]}>
@@ -55,7 +60,7 @@ export default function ProfileScreen() {
   async function save() {
     setSaving(true);
     try {
-      const u = await usersApi.update({ name: name.trim() || undefined, email: email.trim() || undefined });
+      const u = await usersApi.update({ name: name.trim() || undefined });
       updateUser(u); setEditing(false); alert.show("Saved", "Profile updated.", undefined, "success");
     } catch (err: any) { alert.show("Something went wrong", "Could not save. Please try again.", undefined, "error"); }
     finally { setSaving(false); }
@@ -66,6 +71,12 @@ export default function ProfileScreen() {
       { text: "Cancel", style: "cancel" },
       { text: "Sign out", style: "destructive", onPress: () => { disconnectSocket(); logout(); router.replace("/login"); } },
     ], "info");
+  }
+
+  function cancelEditing() {
+    setName(user?.name || "");
+    setEmail(user?.email || "");
+    setEditing(false);
   }
 
   const subEnd = user?.subscription_ends_at;
@@ -86,7 +97,7 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         ) : (
           <View style={{ flexDirection: "row", gap: 10 }}>
-            <TouchableOpacity onPress={() => setEditing(false)} style={[s.editBtn, { backgroundColor: isDark ? "#252528" : "#F0F0F3", borderColor: border }]}>
+            <TouchableOpacity onPress={cancelEditing} style={[s.editBtn, { backgroundColor: isDark ? "#252528" : "#F0F0F3", borderColor: border }]}>
               <Text style={[s.editBtnText, { color: sub }]}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={save} disabled={saving} style={[s.editBtn, { backgroundColor: PRIMARY, borderColor: PRIMARY }]}>
@@ -139,8 +150,8 @@ export default function ProfileScreen() {
             <View style={{ flex: 1 }}>
               <Text style={[s.fieldLabel, { color: sub }]}>Email</Text>
               {editing ? (
-                <TextInput value={email} onChangeText={setEmail} placeholder="your@email.com" placeholderTextColor={sub}
-                  keyboardType="email-address" autoCapitalize="none"
+                <TextInput value={email} placeholder="your@email.com" placeholderTextColor={sub}
+                  editable={false}
                   style={[s.fieldInput, { color: text, borderBottomColor: PRIMARY }]} />
               ) : (
                 <Text style={[s.fieldValue, { color: email ? text : sub }]}>{email || "Not set"}</Text>

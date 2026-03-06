@@ -22,6 +22,7 @@ function messageRowToJson(r) {
   return {
     id: r.id,
     user_id: r.user_id,
+    user_name: r.user_name || null,
     body: r.body,
     created_at: r.created_at,
   };
@@ -59,7 +60,11 @@ router.get('/groups/:groupId/messages', authMiddleware, async (req, res) => {
       return res.status(410).json({ error: 'Chat expired' });
     }
     const rows = await db.rows(
-      'SELECT * FROM messages WHERE group_chat_id = $1 ORDER BY created_at ASC',
+      `SELECT m.*, u.name AS user_name
+       FROM messages m
+       LEFT JOIN users u ON u.id = m.user_id
+       WHERE m.group_chat_id = $1
+       ORDER BY m.created_at ASC`,
       [groupId]
     );
     return res.json(rows.map(messageRowToJson));
@@ -90,7 +95,13 @@ router.post('/groups/:groupId/messages', authMiddleware, async (req, res) => {
       'INSERT INTO messages (id, group_chat_id, user_id, body) VALUES ($1, $2, $3, $4)',
       [id, groupId, req.userId, body]
     );
-    const msg = await db.row('SELECT * FROM messages WHERE id = $1', [id]);
+    const msg = await db.row(
+      `SELECT m.*, u.name AS user_name
+       FROM messages m
+       LEFT JOIN users u ON u.id = m.user_id
+       WHERE m.id = $1`,
+      [id]
+    );
     const msgJson = messageRowToJson(msg);
     req.app.emit('chat:new_message', { groupId, message: msgJson });
     return res.json(msgJson);

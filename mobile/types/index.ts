@@ -56,6 +56,7 @@ export interface GroupChat {
 export interface Message {
   id: string;
   user_id: string;
+  user_name?: string | null;
   body: string;
   created_at: string;
 }

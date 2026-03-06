@@ -36,7 +36,7 @@ export const CATEGORY_COLORS: Record<string, string> = {
   event: '#ef4444',
   study: '#06b6d4',
   nightlife: '#E8751A',
-  other: '#64748b',
+  other: '#E8751A',
 };
 
 export const FREE_POST_LIMIT = 5;

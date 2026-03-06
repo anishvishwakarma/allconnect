@@ -4,6 +4,9 @@ import { useAuthStore } from "../store/auth";
 export default function Index() {
   const token = useAuthStore((s) => s.token);
   const user = useAuthStore((s) => s.user);
+  const hasHydrated = useAuthStore((s) => s.hasHydrated);
+
+  if (!hasHydrated) return null;
 
   if (token) {
     const hasName = !!(user?.name && user.name.trim());
