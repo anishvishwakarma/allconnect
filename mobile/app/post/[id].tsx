@@ -82,12 +82,12 @@ export default function PostDetailScreen() {
     finally { setActionId(null); }
   }
 
-  async function handleAction(userId: string, action: "approve" | "reject") {
-    setActionId(userId + action);
+  async function handleAction(reqUserId: string, action: "approve" | "reject") {
+    setActionId(reqUserId + action);
     try {
-      if (action === "approve") await requestsApi.approve(id, userId);
-      else await requestsApi.reject(id, userId);
-      setRequests((prev) => prev.map((r) => (r.user_id === userId ? { ...r, status: action === "approve" ? "approved" : "rejected" } : r)));
+      if (action === "approve") await requestsApi.approve(id, reqUserId);
+      else await requestsApi.reject(id, reqUserId);
+      setRequests((prev) => prev.map((r) => (r.user_id === reqUserId ? { ...r, status: action === "approve" ? "approved" : "rejected" } : r)));
       if (action === "approve") await load();
     } catch (err: any) { alert.show("Something went wrong", "Action failed. Please try again.", undefined, "error"); }
     finally { setActionId(null); }

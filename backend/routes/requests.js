@@ -50,7 +50,8 @@ router.get('/requests', authMiddleware, async (req, res) => {
       `SELECT jr.*, u.name AS user_name, u.mobile AS user_mobile
        FROM join_requests jr
        LEFT JOIN users u ON u.id = jr.user_id
-       WHERE jr.post_id = $1 ORDER BY jr.created_at ASC`,
+       WHERE jr.post_id = $1
+       ORDER BY jr.created_at ASC`,
       [postId]
     );
     return res.json(rows.map(requestRowToJson));

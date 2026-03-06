@@ -1,25 +1,29 @@
 {
   "name": "allconnect-backend",
   "version": "1.0.0",
-  "description": "AllConnect API + Socket.io — Posts, chats, join requests. PostgreSQL (Supabase) + Firebase Auth.",
+  "description": "AllConnect API + Socket.io — OTP, posts, chats. Plug in SMS and deploy.",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "node scripts/dev.js"
+    "dev": "node scripts/dev.js",
+    "db:init": "node scripts/init-db.js",
+    "db:init:psql": "psql $DATABASE_URL -f schema.sql",
+    "bucket:create": "node scripts/create-avatars-bucket.js"
   },
   "engines": {
     "node": ">=18"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.98.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "expo-server-sdk": "^6.0.0",
     "express": "^4.21.0",
     "firebase-admin": "^13.6.1",
     "jsonwebtoken": "^9.0.2",
-    "@supabase/supabase-js": "^2.45.4",
-    "pg": "^8.13.3",
+    "pg": "^8.12.0",
     "socket.io": "^4.7.4",
-    "uuid": "^11.0.3"
+    "twilio": "^5.0.0",
+    "uuid": "^9.0.1"
   }
 }

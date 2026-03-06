@@ -38,6 +38,8 @@ export interface Post {
 export interface JoinRequest {
   id: string;
   user_id: string;
+  user_name?: string | null;
+  user_mobile?: string | null;
   status: string;
   created_at: string;
 }

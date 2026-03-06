@@ -54,12 +54,17 @@ export default function ChatScreen() {
     });
     socket.on("chat:typing", () => setTyping(true));
     socket.on("chat:stop_typing", () => setTyping(false));
+    socket.on("chat:expired", () => {
+      setExpired(true);
+      alert.show("Chat ended", "This event has ended and the group has been closed.", undefined, "info");
+    });
 
     return () => {
       leaveChatRoom(id);
       socket.off("new_message");
       socket.off("chat:typing");
       socket.off("chat:stop_typing");
+      socket.off("chat:expired");
     };
   }, [id, token]);
 
@@ -88,7 +93,7 @@ export default function ChatScreen() {
     emitStopTyping(id);
     try {
       const msg = await chatsApi.send(id, t);
-      // REST fallback: add sent message locally (socket broadcast also fires if connected)
+      // Avoid duplicates when the REST response and socket event arrive together.
       setMessages((p) => {
         const exists = p.some((m) => m.id === msg.id);
         if (exists) return p;

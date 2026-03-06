@@ -80,20 +80,17 @@ export default function EditProfileScreen() {
     if (!token) return;
     setSaving(true);
     try {
-      // If a new image was picked, upload it to Supabase Storage first
-      let avatarToSave: string | undefined = undefined;
+      let avatarUrl = user?.avatar_uri || null;
       if (avatarBase64) {
-        const uploaded = await usersApi.uploadAvatar(avatarBase64);
-        avatarToSave = uploaded.avatar_uri;
-      } else if (avatarUri && avatarUri.startsWith('http')) {
-        avatarToSave = avatarUri;
+        const res = await usersApi.uploadAvatar(avatarBase64);
+        avatarUrl = res.avatar_uri;
       }
       const u = await usersApi.update({
         name: name.trim() || undefined,
         email: email.trim() || undefined,
-        ...(avatarToSave !== undefined && { avatar_uri: avatarToSave }),
+        avatar_uri: avatarUrl ?? undefined,
       });
-      updateUser(u);
+      updateUser({ ...u, avatar_uri: avatarUrl ?? (u as { avatar_uri?: string })?.avatar_uri });
       alert.show("Saved", "Profile updated.", undefined, "success");
       router.back();
     } catch (err: any) {
