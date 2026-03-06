@@ -46,7 +46,7 @@ export async function getNearbyPosts(req: Request, res: Response): Promise<void>
 
   try {
     const posts = await Post.find(filter)
-      .select('title category location addressText eventAt durationMinutes costPerPerson maxParticipants participantCount status')
+      .select('title category location addressText eventAt durationMinutes costPerPerson maxParticipants participantCount hostId status')
       .limit(100)
       .lean();
 
@@ -56,12 +56,13 @@ export async function getNearbyPosts(req: Request, res: Response): Promise<void>
       category: p.category,
       lat: p.location.coordinates[1],
       lng: p.location.coordinates[0],
-      addressText: p.addressText,
-      eventAt: p.eventAt,
-      durationMinutes: p.durationMinutes,
-      costPerPerson: p.costPerPerson,
-      maxParticipants: p.maxParticipants,
-      participantCount: p.participantCount,
+      address_text: p.addressText || null,
+      event_at: p.eventAt,
+      duration_minutes: p.durationMinutes,
+      cost_per_person: p.costPerPerson,
+      max_people: p.maxParticipants,
+      participant_count: p.participantCount,
+      host_id: p.hostId,
       status: p.status,
     }));
 
@@ -83,10 +84,10 @@ export async function getMyPosts(req: Request, res: Response): Promise<void> {
       id: p._id,
       title: p.title,
       category: p.category,
-      eventAt: p.eventAt,
+      event_at: p.eventAt,
       status: p.status,
-      participantCount: p.participantCount,
-      maxParticipants: p.maxParticipants,
+      participant_count: p.participantCount,
+      max_people: p.maxParticipants,
       role: 'created',
     }));
     sendSuccess(res, result);
@@ -118,7 +119,7 @@ export async function getPostHistory(req: Request, res: Response): Promise<void>
       id: p._id,
       title: p.title,
       category: p.category,
-      eventAt: p.eventAt,
+      event_at: p.eventAt,
       status: p.status,
       role: 'created',
     }));
@@ -131,15 +132,15 @@ export async function getPostHistory(req: Request, res: Response): Promise<void>
           id: p._id,
           title: p.title,
           category: p.category,
-          eventAt: p.eventAt,
+          event_at: p.eventAt,
           status: p.status,
           role: 'joined',
         };
       });
 
-    // Merge and sort by eventAt desc
+    // Merge and sort by event_at desc
     const combined = [...created, ...joined].sort(
-      (a, b) => new Date(b.eventAt).getTime() - new Date(a.eventAt).getTime()
+      (a, b) => new Date(b.event_at).getTime() - new Date(a.event_at).getTime()
     );
 
     sendSuccess(res, combined);
@@ -160,21 +161,21 @@ export async function getPost(req: Request, res: Response): Promise<void> {
     sendSuccess(res, {
       id: post._id,
       title: post.title,
-      description: post.description,
+      description: post.description || null,
       category: post.category,
       lat: post.location.coordinates[1],
       lng: post.location.coordinates[0],
-      addressText: post.addressText,
-      eventAt: post.eventAt,
-      durationMinutes: post.durationMinutes,
-      expiresAt: post.expiresAt,
-      costPerPerson: post.costPerPerson,
-      maxParticipants: post.maxParticipants,
-      participantCount: post.participantCount,
-      hostId: post.hostId,
-      approvalRequired: post.approvalRequired,
+      address_text: post.addressText || null,
+      event_at: post.eventAt,
+      duration_minutes: post.durationMinutes,
+      expires_at: post.expiresAt,
+      cost_per_person: post.costPerPerson,
+      max_people: post.maxParticipants,
+      participant_count: post.participantCount,
+      host_id: post.hostId,
+      approval_required: post.approvalRequired,
       status: post.status,
-      groupChatId: post.groupChatId,
+      group_chat_id: post.groupChatId || null,
     });
   } catch {
     sendError(res, 500, 'Failed to fetch post');
@@ -221,7 +222,24 @@ export async function createPost(req: Request, res: Response): Promise<void> {
     // Increment post count
     await User.findByIdAndUpdate(user._id, { $inc: { postsThisMonth: 1 } });
 
-    sendSuccess(res, { id: post._id, ...post.toObject() }, 201);
+    sendSuccess(res, {
+      id: post._id,
+      title: post.title,
+      description: post.description || null,
+      category: post.category,
+      lat: post.location.coordinates[1],
+      lng: post.location.coordinates[0],
+      address_text: post.addressText || null,
+      event_at: post.eventAt,
+      duration_minutes: post.durationMinutes,
+      expires_at: post.expiresAt,
+      cost_per_person: post.costPerPerson,
+      max_people: post.maxParticipants,
+      participant_count: post.participantCount,
+      host_id: post.hostId,
+      approval_required: post.approvalRequired,
+      status: post.status,
+    }, 201);
   } catch (err: any) {
     console.error('createPost error:', err);
     sendError(res, 500, 'Failed to create post');

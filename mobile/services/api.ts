@@ -106,9 +106,6 @@ export const authApi = {
         timeoutMs: AUTH_TIMEOUT_MS,
       })
     ),
-  // Get email for login-by-mobile (rate limited)
-  getEmailForLogin: (mobile: string) =>
-    request<{ email: string }>(`/api/auth/email-for-login?mobile=${encodeURIComponent(mobile)}`),
   // OTP auth (kept for future mobile login - not shown in UI for now)
   sendOtp: (mobile: string) =>
     request<{ success: boolean }>('/api/auth/send-otp', {
@@ -127,10 +124,10 @@ export const usersApi = {
   me: () => request<User>('/api/users/me'),
   update: (data: { name?: string; email?: string; avatar_uri?: string }) =>
     request<User>('/api/users/me', { method: 'PATCH', body: JSON.stringify(data) }),
-  uploadAvatar: (base64Image: string) =>
+  uploadAvatar: (base64Data: string) =>
     request<{ avatar_uri: string }>('/api/users/avatar', {
       method: 'POST',
-      body: JSON.stringify({ image: base64Image }),
+      body: JSON.stringify({ image: base64Data }),
     }),
   registerPushToken: (token: string, platform?: string) =>
     request<{ success: boolean }>('/api/users/push-token', {
@@ -147,7 +144,7 @@ export const postsApi = {
     const qs = new URLSearchParams({
       lat: String(lat),
       lng: String(lng),
-      radius_km: String(radiusKm),
+      radius_km: String(radiusKm),   // Supabase backend expects 'radius_km'
       ...params,
     });
     return request<Post[]>(`/api/posts/nearby?${qs}`);
@@ -166,22 +163,23 @@ export const postsApi = {
     duration_minutes: number;
     cost_per_person?: number;
     max_people: number;
-    privacy_type?: string;
+    privacy_type?: string | null;
   }) =>
     request<Post>('/api/posts', { method: 'POST', body: JSON.stringify(data) }),
 };
 
 // ── Join Requests ────────────────────────────────────────
 export const requestsApi = {
-  send: (postId: string) =>
+  send: (postId: string, message?: string) =>
     request<{ success: boolean }>(`/api/posts/${postId}/request`, {
       method: 'POST',
-      body: JSON.stringify({}),
+      body: JSON.stringify(message ? { message } : {}),
     }),
   forPost: (postId: string) =>
     request<JoinRequest[]>(`/api/posts/${postId}/requests`),
   myRequest: (postId: string) =>
     request<JoinRequest | null>(`/api/posts/${postId}/my-request`),
+  // userId comes from requestsApi.forPost() response item.user_id
   approve: (postId: string, userId: string) =>
     request<{ success: boolean }>(`/api/posts/${postId}/approve`, {
       method: 'POST',
@@ -197,11 +195,11 @@ export const requestsApi = {
 // ── Chats ────────────────────────────────────────────────
 export const chatsApi = {
   mine: () => request<GroupChat[]>('/api/chats/groups'),
-  messages: (groupId: string) =>
-    request<Message[]>(`/api/chats/groups/${groupId}/messages`),
-  send: (groupId: string, body: string) =>
-    request<Message>(`/api/chats/groups/${groupId}/messages`, {
+  messages: (chatId: string) =>
+    request<Message[]>(`/api/chats/groups/${chatId}/messages`),
+  send: (chatId: string, body: string) =>
+    request<Message>(`/api/chats/groups/${chatId}/messages`, {
       method: 'POST',
-      body: JSON.stringify({ body }),
+      body: JSON.stringify({ body }),   // Supabase backend expects 'body' field
     }),
 };

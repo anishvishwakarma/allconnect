@@ -1,10 +1,9 @@
-// Shapes match PostgreSQL backend (snake_case from API)
+// Shapes match Supabase/PostgreSQL backend API responses (snake_case)
 export interface User {
   id: string;
   mobile: string;
   name?: string | null;
   email?: string | null;
-  /** Data URI (e.g. data:image/jpeg;base64,...) or file URI for profile picture. Stored locally until backend supports upload. */
   avatar_uri?: string | null;
   kyc_verified?: boolean;
   posts_this_month: number;
@@ -20,7 +19,7 @@ export type PostCategory = typeof POST_CATEGORIES[number];
 
 export interface Post {
   id: string;
-  host_id?: string;
+  host_id?: string | null;
   title: string;
   description?: string | null;
   category: PostCategory | string;
@@ -29,9 +28,10 @@ export interface Post {
   address_text?: string | null;
   event_at: string;
   duration_minutes?: number;
-  cost_per_person?: number;
+  cost_per_person?: number | null;
   max_people: number;
   status: string;
+  privacy_type?: string | null;
   created_at?: string;
 }
 
@@ -44,10 +44,10 @@ export interface JoinRequest {
 
 export interface GroupChat {
   id: string;
-  post_id: string;
+  post_id?: string | null;
   title?: string;
-  category?: string;
-  event_at?: string;
+  category?: string | null;
+  event_at?: string | null;
   expires_at: string;
 }
 

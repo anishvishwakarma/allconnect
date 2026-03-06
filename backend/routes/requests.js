@@ -11,6 +11,8 @@ function requestRowToJson(r) {
   return {
     id: r.id,
     user_id: r.user_id,
+    user_name: r.user_name || null,
+    user_mobile: r.user_mobile || null,
     status: r.status,
     created_at: r.created_at,
   };
@@ -45,7 +47,10 @@ router.get('/requests', authMiddleware, async (req, res) => {
     if (!post) return res.status(404).json({ error: 'Post not found' });
     if (post.host_id !== req.userId) return res.status(403).json({ error: 'Forbidden' });
     const rows = await db.rows(
-      'SELECT * FROM join_requests WHERE post_id = $1 ORDER BY created_at ASC',
+      `SELECT jr.*, u.name AS user_name, u.mobile AS user_mobile
+       FROM join_requests jr
+       LEFT JOIN users u ON u.id = jr.user_id
+       WHERE jr.post_id = $1 ORDER BY jr.created_at ASC`,
       [postId]
     );
     return res.json(rows.map(requestRowToJson));

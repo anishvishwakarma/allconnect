@@ -77,16 +77,13 @@ export function initChatSocket(io: SocketServer): void {
           text: text.trim().slice(0, 2000),
         });
 
-        const payload = {
+        // Broadcast to room — payload matches mobile Message type
+        io.to(`chat:${chatId}`).emit('chat:message', {
           id: message._id,
-          chatId,
-          senderId: user.userId,
-          text: message.text,
-          createdAt: message.createdAt,
-        };
-
-        // Broadcast to room (including sender)
-        io.to(`chat:${chatId}`).emit('chat:message', payload);
+          user_id: user.userId,
+          body: message.text,
+          created_at: message.createdAt,
+        });
       } catch (err) {
         console.error('chat:send error:', err);
         socket.emit('chat:error', { message: 'Failed to send message' });

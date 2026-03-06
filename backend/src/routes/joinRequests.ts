@@ -3,6 +3,7 @@ import { body } from 'express-validator';
 import {
   requestToJoin,
   getPostRequests,
+  getMyRequestForPost,
   updateRequest,
   getMyRequests,
 } from '../controllers/joinRequestController';
@@ -12,7 +13,7 @@ import { validate } from '../middleware/validation';
 const router = Router();
 
 // User's own requests
-router.get('/mine', requireAuth, getMyRequests);
+router.get('/requests/mine', requireAuth, getMyRequests);
 
 // Per-post request operations
 router.post(
@@ -24,6 +25,7 @@ router.post(
 );
 
 router.get('/posts/:postId/requests', requireAuth, getPostRequests);
+router.get('/posts/:postId/my-request', requireAuth, getMyRequestForPost);
 
 router.put(
   '/posts/:postId/requests/:requestId',

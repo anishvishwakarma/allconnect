@@ -48,13 +48,18 @@ export async function getPostRequests(req: Request, res: Response): Promise<void
       .sort({ createdAt: 1 })
       .lean();
 
-    sendSuccess(res, requests.map((r) => ({
-      id: r._id,
-      user: r.userId,
-      status: r.status,
-      message: r.message,
-      createdAt: r.createdAt,
-    })));
+    sendSuccess(res, requests.map((r) => {
+      const u = r.userId as any;
+      return {
+        id: r._id,
+        user_id: u?._id || r.userId,
+        user_name: u?.name || null,
+        user_phone: u?.phone || null,
+        status: r.status,
+        message: r.message || null,
+        created_at: r.createdAt,
+      };
+    }));
   } catch {
     sendError(res, 500, 'Failed to fetch requests');
   }
@@ -132,6 +137,26 @@ export async function updateRequest(req: Request, res: Response): Promise<void> 
   } catch (err) {
     console.error('updateRequest error:', err);
     sendError(res, 500, 'Failed to update request');
+  }
+}
+
+// GET /api/posts/:postId/my-request  — current user's request for a specific post
+export async function getMyRequestForPost(req: Request, res: Response): Promise<void> {
+  try {
+    const { postId } = req.params;
+    const userId = req.user!.userId;
+    const jreq = await JoinRequest.findOne({ postId, userId }).lean();
+    if (!jreq) {
+      sendSuccess(res, null);
+      return;
+    }
+    sendSuccess(res, {
+      id: jreq._id,
+      status: jreq.status,
+      created_at: jreq.createdAt,
+    });
+  } catch {
+    sendError(res, 500, 'Failed to fetch request');
   }
 }
 

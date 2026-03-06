@@ -14,8 +14,12 @@ try {
   // Port may already be free
 }
 
-spawn('node', ['--watch', path.join(__dirname, '..', 'index.js')], {
-  stdio: 'inherit',
-  env: process.env,
-  cwd: path.join(__dirname, '..'),
-});
+spawn(
+  'node',
+  ['--watch', path.join(__dirname, '..', 'index.js')],
+  {
+    stdio: 'inherit',
+    env: process.env,
+    cwd: path.join(__dirname, '..'),
+  }
+);

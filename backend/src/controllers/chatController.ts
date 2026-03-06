@@ -20,12 +20,12 @@ export async function getMyChats(req: Request, res: Response): Promise<void> {
       return {
         id: c._id,
         name: c.name,
-        postId: p?._id,
+        post_id: p?._id || null,
         title: p?.title ?? c.name,
-        category: p?.category,
-        eventAt: p?.eventAt,
-        expiresAt: c.expiresAt,
-        memberCount: c.members.length,
+        category: p?.category || null,
+        event_at: p?.eventAt || null,
+        expires_at: c.expiresAt,
+        member_count: c.members.length,
       };
     }));
   } catch {
@@ -53,9 +53,10 @@ export async function getChatMessages(req: Request, res: Response): Promise<void
       const s = m.senderId as any;
       return {
         id: m._id,
-        sender: { id: s._id, name: s.name, phone: s.phone, avatar: s.avatar },
-        text: m.text,
-        createdAt: m.createdAt,
+        user_id: s?._id || m.senderId,
+        sender_name: s?.name || null,
+        body: m.text,
+        created_at: m.createdAt,
       };
     }));
   } catch {
@@ -90,13 +91,18 @@ export async function sendMessage(req: Request, res: Response): Promise<void> {
     if (io) {
       io.to(`chat:${chatId}`).emit('chat:message', {
         id: message._id,
-        senderId: req.user!.userId,
-        text: message.text,
-        createdAt: message.createdAt,
+        user_id: req.user!.userId,
+        body: message.text,
+        created_at: message.createdAt,
       });
     }
 
-    sendSuccess(res, { id: message._id, text: message.text, createdAt: message.createdAt }, 201);
+    sendSuccess(res, {
+      id: message._id,
+      user_id: req.user!.userId,
+      body: message.text,
+      created_at: message.createdAt,
+    }, 201);
   } catch {
     sendError(res, 500, 'Failed to send message');
   }

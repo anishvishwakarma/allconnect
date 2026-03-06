@@ -25,6 +25,7 @@ import { GroupChat } from './models/GroupChat';
 
 // ── App setup ────────────────────────────────────────────
 const app = express();
+app.set('trust proxy', 1); // Required for correct client IP behind Render/Railway/proxy
 const server = http.createServer(app);
 
 // ── Socket.io ────────────────────────────────────────────

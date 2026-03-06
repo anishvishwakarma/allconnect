@@ -14,7 +14,7 @@ import { useAuthStore } from "../../store/auth";
 import { postsApi, requestsApi } from "../../services/api";
 import { useAppTheme } from "../../context/ThemeContext";
 import { useAlert } from "../../context/AlertContext";
-import { getBottomInset } from "../../constants/config";
+import { getBottomInset, CATEGORY_COLORS as CAT_COLORS } from "../../constants/config";
 
 const PRIMARY = "#E8751A";
 const AUTO_REFRESH_INTERVAL_MS = 45000; // 45 seconds - auto-refresh to show new activities
@@ -26,12 +26,6 @@ const WHEN_FILTERS = [
   { key: "tonight", label: "Tonight" },
   { key: "weekend", label: "Weekend" },
 ];
-
-const CAT_COLORS: Record<string, string> = {
-  activity: "#30D158", need: "#0A84FF", selling: "#FFD60A",
-  meetup: "#BF5AF2", event: "#FF453A", study: "#32ADE6",
-  nightlife: "#E8751A", other: "#636366",
-};
 
 function formatEventTime(iso?: string | null): string {
   if (!iso) return "—";

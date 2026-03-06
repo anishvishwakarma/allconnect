@@ -14,7 +14,7 @@ export async function verifyAuth(req: Request, res: Response): Promise<void> {
   try {
     // Verify the Firebase ID token
     const decoded = await verifyFirebaseToken(idToken);
-    const { uid, phone_number } = decoded;
+    const { uid, phone_number, email: firebaseEmail } = decoded as any;
 
     // phone_number present for phone-OTP auth; mobile from body for email/password auth
     const phone = phone_number || mobile || null;
@@ -35,7 +35,12 @@ export async function verifyAuth(req: Request, res: Response): Promise<void> {
       user = await User.create({
         firebaseUid: uid,
         phone,
+        email: firebaseEmail || undefined,
       });
+    } else if (firebaseEmail && !user.email) {
+      // Store email if not already set
+      user.email = firebaseEmail;
+      await user.save();
     }
 
     const token = signToken({ userId: user._id.toString(), phone: user.phone });
@@ -44,11 +49,13 @@ export async function verifyAuth(req: Request, res: Response): Promise<void> {
       token,
       user: {
         id: user._id,
-        phone: user.phone,
-        name: user.name,
-        avatar: user.avatar,
-        postsThisMonth: user.postsThisMonth,
-        subscriptionEndsAt: user.subscriptionEndsAt,
+        mobile: user.phone,
+        email: user.email || null,
+        name: user.name || null,
+        avatar_uri: user.avatar || null,
+        bio: user.bio || null,
+        posts_this_month: user.postsThisMonth,
+        subscription_ends_at: user.subscriptionEndsAt || null,
       },
     });
   } catch (err: any) {

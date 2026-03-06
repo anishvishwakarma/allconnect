@@ -53,15 +53,15 @@ export default function PostDetailScreen() {
         if (hostId === user?.id) {
           setRequests(await requestsApi.forPost(id));
           const groups = await chatsApi.mine();
-          const g = groups.find((gr: any) => gr.post_id === id);
-          setGroupChatId(g?.id ?? null);
+          const g = groups.find((gr: any) => String(gr.post_id) === id);
+          setGroupChatId(g?.id ? String(g.id) : null);
         } else {
           const myReq = await requestsApi.myRequest(id);
           setMyRequest(myReq ?? null);
           if (myReq?.status === "approved") {
             const groups = await chatsApi.mine();
-            const g = groups.find((gr: any) => gr.post_id === id);
-            setGroupChatId(g?.id ?? null);
+            const g = groups.find((gr: any) => String(gr.post_id) === id);
+            setGroupChatId(g?.id ? String(g.id) : null);
           } else {
             setGroupChatId(null);
           }
@@ -82,12 +82,12 @@ export default function PostDetailScreen() {
     finally { setActionId(null); }
   }
 
-  async function handleAction(reqUserId: string, action: "approve" | "reject") {
-    setActionId(reqUserId + action);
+  async function handleAction(userId: string, action: "approve" | "reject") {
+    setActionId(userId + action);
     try {
-      if (action === "approve") await requestsApi.approve(id, reqUserId);
-      else await requestsApi.reject(id, reqUserId);
-      setRequests((prev) => prev.map((r) => (r.user_id === reqUserId ? { ...r, status: action === "approve" ? "approved" : "rejected" } : r)));
+      if (action === "approve") await requestsApi.approve(id, userId);
+      else await requestsApi.reject(id, userId);
+      setRequests((prev) => prev.map((r) => (r.user_id === userId ? { ...r, status: action === "approve" ? "approved" : "rejected" } : r)));
       if (action === "approve") await load();
     } catch (err: any) { alert.show("Something went wrong", "Action failed. Please try again.", undefined, "error"); }
     finally { setActionId(null); }
@@ -145,7 +145,7 @@ export default function PostDetailScreen() {
           <InfoRow icon="people-outline" label="Spots" value={`Max ${post.max_people ?? post.maxParticipants ?? 0}`} catColor={catColor} surface={surface} text={text} sub={sub} border={border} />
           {(post.cost_per_person ?? post.costPerPerson) > 0 && <InfoRow icon="cash-outline" label="Cost" value={`₹${post.cost_per_person ?? post.costPerPerson} per person`} catColor={catColor} surface={surface} text={text} sub={sub} border={border} />}
           {(post.address_text || post.addressText) && <InfoRow icon="location-outline" label="Location" value={post.address_text || post.addressText} catColor={catColor} surface={surface} text={text} sub={sub} border={border} />}
-          <InfoRow icon="shield-checkmark-outline" label="Approval" value="Host approval required" catColor={catColor} surface={surface} text={text} sub={sub} border={border} />
+          {post.privacy_type === 'approval' && <InfoRow icon="shield-checkmark-outline" label="Approval" value="Host approval required" catColor={catColor} surface={surface} text={text} sub={sub} border={border} />}
         </View>
 
         {/* ── Group chat button (when user is approved) ── */}
@@ -183,11 +183,11 @@ export default function PostDetailScreen() {
                 <View style={s.reqTop}>
                   <View style={[s.reqAvatar, { backgroundColor: PRIMARY + "18" }]}>
                     <Text style={[s.reqAvatarText, { color: PRIMARY }]}>
-                      {(req.user_id || "?")[0].toUpperCase()}
+                      {(req.user_name || req.user_mobile || "?")[0].toUpperCase()}
                     </Text>
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[s.reqName, { color: text }]}>User {req.user_id?.slice(0, 8)}</Text>
+                    <Text style={[s.reqName, { color: text }]}>{req.user_name || req.user_mobile || `User #${String(req.user_id || "").slice(-6)}`}</Text>
                     <Text style={[s.reqPhone, { color: sub }]}>Requested {new Date(req.created_at).toLocaleString()}</Text>
                   </View>
                   <StatusPill status={req.status} />

@@ -1,13 +1,13 @@
 const mapsApiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || "";
 
-// Firebase config — set EXPO_PUBLIC_FIREBASE_* in .env (local) and EAS Secrets (production builds)
+// Firebase config — env overrides for local, fallbacks ensure production APK has config
 const firebase = {
-  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY || "",
-  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || "",
-  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || "",
-  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET || "",
-  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "",
-  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID || "",
+  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY || "AIzaSyDSSYTVrBPPPQQRQ5dS-MCQWNqv2RuhrOo",
+  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || "allconnect-ec83c.firebaseapp.com",
+  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || "allconnect-ec83c",
+  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET || "allconnect-ec83c.firebasestorage.app",
+  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "820511178788",
+  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID || "1:820511178788:web:1d9f171a621e5c7c27d8b1",
 };
 
 module.exports = {

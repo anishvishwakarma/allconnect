@@ -10,14 +10,13 @@ export async function getMe(req: Request, res: Response): Promise<void> {
 
     sendSuccess(res, {
       id: user._id,
-      phone: user.phone,
-      name: user.name,
-      avatar: user.avatar,
-      bio: user.bio,
-      postsThisMonth: user.postsThisMonth,
-      subscriptionEndsAt: user.subscriptionEndsAt,
-      isActive: user.isActive,
-      createdAt: user.createdAt,
+      mobile: user.phone,
+      email: user.email || null,
+      name: user.name || null,
+      avatar_uri: user.avatar || null,
+      bio: user.bio || null,
+      posts_this_month: user.postsThisMonth,
+      subscription_ends_at: user.subscriptionEndsAt || null,
     });
   } catch {
     sendError(res, 500, 'Failed to fetch user');
@@ -27,7 +26,12 @@ export async function getMe(req: Request, res: Response): Promise<void> {
 // PUT /api/users/me
 export async function updateMe(req: Request, res: Response): Promise<void> {
   try {
-    const { name, bio, avatar } = req.body as { name?: string; bio?: string; avatar?: string };
+    const { name, bio, avatar, email } = req.body as {
+      name?: string;
+      bio?: string;
+      avatar?: string;
+      email?: string;
+    };
 
     const user = await User.findByIdAndUpdate(
       req.user!.userId,
@@ -35,6 +39,7 @@ export async function updateMe(req: Request, res: Response): Promise<void> {
         ...(name !== undefined && { name: name.trim().slice(0, 60) }),
         ...(bio !== undefined && { bio: bio.trim().slice(0, 200) }),
         ...(avatar !== undefined && { avatar }),
+        ...(email !== undefined && { email: email.trim().toLowerCase() }),
       },
       { new: true, runValidators: true }
     ).lean();
@@ -43,10 +48,13 @@ export async function updateMe(req: Request, res: Response): Promise<void> {
 
     sendSuccess(res, {
       id: user._id,
-      phone: user.phone,
-      name: user.name,
-      avatar: user.avatar,
-      bio: user.bio,
+      mobile: user.phone,
+      email: user.email || null,
+      name: user.name || null,
+      avatar_uri: user.avatar || null,
+      bio: user.bio || null,
+      posts_this_month: user.postsThisMonth,
+      subscription_ends_at: user.subscriptionEndsAt || null,
     });
   } catch {
     sendError(res, 500, 'Failed to update user');

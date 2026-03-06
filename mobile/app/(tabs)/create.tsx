@@ -118,7 +118,7 @@ export default function CreatePostScreen() {
         duration_minutes: Number(durationMinutes) || 60,
         cost_per_person: Number(costPerPerson) || 0,
         max_people: Number(maxParticipants),
-        privacy_type: approvalRequired ? "public" : "public",
+        privacy_type: approvalRequired ? 'approval' : null,
       });
       alert.show("Posted!", "Your post is live on the map.", [
         { text: "View Post", onPress: () => router.push(`/post/${post.id}`) },

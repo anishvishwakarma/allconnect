@@ -72,20 +72,20 @@ export default function CompleteProfileScreen() {
     }
     setSaving(true);
     try {
-      let finalAvatarUri = user?.avatar_uri || null;
+      // If a new image was picked, upload it to Supabase Storage first
+      let avatarToSave: string | undefined = undefined;
       if (avatarBase64) {
-        const { avatar_uri } = await usersApi.uploadAvatar(avatarBase64);
-        finalAvatarUri = avatar_uri;
+        const uploaded = await usersApi.uploadAvatar(avatarBase64);
+        avatarToSave = uploaded.avatar_uri;
+      } else if (avatarUri && avatarUri.startsWith('http')) {
+        avatarToSave = avatarUri;
       }
       const u = await usersApi.update({
         name: trimmedName,
         email: email.trim() || undefined,
-        avatar_uri: finalAvatarUri ?? undefined,
+        ...(avatarToSave !== undefined && { avatar_uri: avatarToSave }),
       });
-      updateUser({
-        ...u,
-        avatar_uri: finalAvatarUri ?? (u as { avatar_uri?: string })?.avatar_uri,
-      });
+      updateUser(u);
       router.replace("/(tabs)/map");
     } catch (err: any) {
       alert.show("Something went wrong", "Could not save. Please try again.", undefined, "error");
