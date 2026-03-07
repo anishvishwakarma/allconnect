@@ -31,6 +31,12 @@ if (missingEnv.length > 0) {
 module.exports = {
   expo: {
     name: "AllConnect",
+    // Use embedded bundle only — no OTA update fetch (avoids "Failed to download remote update" crash)
+    updates: {
+      enabled: false,
+      checkAutomatically: "NEVER",
+      fallbackToCacheTimeout: 0,
+    },
     extra: {
       eas: {
         projectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID || "58c0688a-478a-4e60-b4ec-cdb78d108e11",
