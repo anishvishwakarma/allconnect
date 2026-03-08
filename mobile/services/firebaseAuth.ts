@@ -17,6 +17,7 @@ import {
   User,
   UserCredential,
 } from 'firebase/auth';
+import { PASSWORD_RESET_CONTINUE_URL } from '../constants/config';
 
 const { getReactNativePersistence } = require('@firebase/auth') as {
   getReactNativePersistence: (storage: typeof AsyncStorage) => unknown;
@@ -92,7 +93,10 @@ export async function getCurrentFirebaseIdToken(): Promise<string | null> {
 
 export async function sendPasswordReset(email: string): Promise<void> {
   const auth = getFirebaseAuthInstance();
-  await sendPasswordResetEmail(auth, email.trim().toLowerCase());
+  await sendPasswordResetEmail(auth, email.trim().toLowerCase(), {
+    url: PASSWORD_RESET_CONTINUE_URL,
+    handleCodeInApp: false,
+  });
 }
 
 export async function signOutFirebase(): Promise<void> {

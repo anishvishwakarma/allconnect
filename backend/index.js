@@ -26,7 +26,7 @@ const io = new Server(server, {
 });
 
 app.use(cors({ origin: corsOrigin }));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 app.get('/health', (req, res) => res.json({ ok: true }));
 app.get('/', (req, res) => res.json({ name: 'AllConnect API', health: '/health' }));

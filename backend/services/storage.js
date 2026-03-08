@@ -54,7 +54,12 @@ async function uploadAvatar(userId, base64Data) {
       : '';
     throw new Error('Upload failed.' + hint);
   }
-  const { data: urlData } = client.storage.from(BUCKET).getPublicUrl(data.path);
+  const upPath = data && (data.path || data.Key || data.key);
+  if (!upPath) {
+    console.error('Supabase upload response missing path:', data);
+    throw new Error('Upload failed. Storage response invalid.');
+  }
+  const { data: urlData } = client.storage.from(BUCKET).getPublicUrl(upPath);
   return urlData?.publicUrl || null;
 }
 

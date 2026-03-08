@@ -73,14 +73,23 @@ router.post('/avatar', async (req, res) => {
     if (!url) {
       return res.status(503).json({ error: 'Storage not configured' });
     }
-    await db.query(
-      'UPDATE users SET avatar_uri = $1, updated_at = NOW() WHERE id = $2',
-      [url, req.userId]
-    );
+    try {
+      await db.query(
+        'UPDATE users SET avatar_uri = $1, updated_at = NOW() WHERE id = $2',
+        [url, req.userId]
+      );
+    } catch (dbErr) {
+      console.error('users/avatar DB update', dbErr);
+      const code = dbErr && dbErr.code;
+      const msg = code === '22P02' ? 'Invalid user id' : (dbErr && dbErr.message) || 'Database update failed';
+      return res.status(400).json({ error: msg });
+    }
     return res.json({ avatar_uri: url });
   } catch (err) {
     console.error('users/avatar', err);
-    return res.status(500).json({ error: 'Server error' });
+    const msg = (err && typeof err.message === 'string' ? err.message : (err && typeof err === 'object' ? '' : String(err))).slice(0, 200);
+    const safe = msg && /storage|upload|bucket|network/i.test(msg) ? msg : 'Upload failed. Try again.';
+    return res.status(500).json({ error: safe });
   }
 });
 

@@ -18,6 +18,7 @@ import { getBottomInset } from "../../constants/config";
 
 const PRIMARY = "#E8751A";
 const AUTO_REFRESH_INTERVAL_MS = 45000; // 45 seconds - auto-refresh to show new activities
+const TAB_BAR_BASE_HEIGHT = 56; // match (tabs) _layout tabBarStyle height
 const { height: SCREEN_H } = Dimensions.get("window");
 
 const CATEGORIES = ["activity","need","selling","meetup","event","study","nightlife","other"] as const;
@@ -290,17 +291,17 @@ export default function MapScreen() {
         {locating ? <ActivityIndicator size="small" color={PRIMARY} /> : <Ionicons name="locate-outline" size={20} color={PRIMARY} />}
       </TouchableOpacity>
 
-      {/* ── Loading indicator ── */}
-      {loading && (
+      {/* ── Loading indicator (hide when map failed so we don't show both) ── */}
+      {loading && !mapLoadError && (
         <View style={[s.loadingBadge, { backgroundColor: surface, top: insets.top + 110 }]}>
           <ActivityIndicator size="small" color={PRIMARY} />
           <Text style={[s.loadingText, { color: sub }]}>Refreshing...</Text>
         </View>
       )}
 
-      {/* ── Pin detail card ── */}
+      {/* ── Pin detail card (above tab bar so View Details is fully visible) ── */}
       {selectedPin && (
-        <View style={[s.pinCard, { backgroundColor: surface, borderColor: border, bottom: getBottomInset(insets.bottom) }]}>
+        <View style={[s.pinCard, { backgroundColor: surface, borderColor: border, bottom: TAB_BAR_BASE_HEIGHT + getBottomInset(insets.bottom) }]}>
           <View style={s.handle} />
           <View style={{ flexDirection: "row", alignItems: "flex-start", marginBottom: 12 }}>
             <View style={{ flex: 1 }}>
@@ -415,7 +416,7 @@ const s = StyleSheet.create({
   pinCard: {
     position: "absolute", left: 0, right: 0,
     borderTopLeftRadius: 28, borderTopRightRadius: 28,
-    padding: 20, paddingBottom: 36,
+    padding: 20, paddingBottom: 48,
     borderTopWidth: StyleSheet.hairlineWidth,
     shadowColor: "#000", shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 20,
   },

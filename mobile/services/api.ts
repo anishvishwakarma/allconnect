@@ -133,6 +133,7 @@ export const usersApi = {
     request<{ avatar_uri: string }>('/api/users/avatar', {
       method: 'POST',
       body: JSON.stringify({ image: base64Image }),
+      timeoutMs: 30000,
     }),
   registerPushToken: (token: string, platform?: string) =>
     request<{ success: boolean }>('/api/users/push-token', {

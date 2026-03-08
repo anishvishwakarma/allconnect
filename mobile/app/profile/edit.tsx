@@ -84,13 +84,17 @@ export default function EditProfileScreen() {
     setUploadingAvatar(true);
     try {
       const { avatar_uri } = await usersApi.uploadAvatar(avatarBase64);
-      setAvatarUri(avatar_uri);
-      setAvatarBase64(null);
-      updateUser({ avatar_uri });
-      alert.show("Uploaded", "Photo uploaded. Tap Save to update your profile.", undefined, "success");
+      if (avatar_uri) {
+        setAvatarUri(avatar_uri);
+        setAvatarBase64(null);
+        updateUser({ avatar_uri });
+        alert.show("Uploaded", "Photo uploaded. Tap Save to update your profile.", undefined, "success");
+      } else {
+        alert.show("Upload failed", "No URL returned. Try again.", undefined, "error");
+      }
     } catch (err: any) {
       const msg = err?.message || "Upload failed. Try again.";
-      const isStorage = msg.includes("Storage not configured") || msg.includes("Upload failed") || msg.includes("Image too large");
+      const isStorage = msg.includes("Storage not configured") || msg.includes("Upload failed") || msg.includes("Image too large") || msg.includes("bucket");
       alert.show(isStorage ? "Photo upload issue" : "Something went wrong", msg, undefined, "error");
     } finally {
       setUploadingAvatar(false);
@@ -104,7 +108,11 @@ export default function EditProfileScreen() {
       let avatarUrl = user?.avatar_uri || null;
       if (avatarBase64) {
         const res = await usersApi.uploadAvatar(avatarBase64);
-        avatarUrl = res.avatar_uri;
+        avatarUrl = res?.avatar_uri ?? null;
+        if (avatarUrl) {
+          setAvatarUri(avatarUrl);
+          setAvatarBase64(null);
+        }
       }
       const u = await usersApi.update({
         name: name.trim() || undefined,
@@ -115,7 +123,7 @@ export default function EditProfileScreen() {
       router.back();
     } catch (err: any) {
       const msg = err?.message || "Could not save. Please try again.";
-      const isStorage = msg.includes("Storage not configured") || msg.includes("Upload failed") || msg.includes("Image too large");
+      const isStorage = msg.includes("Storage not configured") || msg.includes("Upload failed") || msg.includes("Image too large") || msg.includes("bucket");
       alert.show(
         isStorage ? "Photo upload issue" : "Something went wrong",
         msg,
@@ -133,18 +141,20 @@ export default function EditProfileScreen() {
     <ScrollView style={[s.scroll, { backgroundColor: bg }]} contentContainerStyle={[s.content, { paddingTop: insets.top + 16, paddingBottom: getBottomInset(insets.bottom) + 24 }]}>
       <Text style={[s.title, { color: text }]}>Edit profile</Text>
 
-      <TouchableOpacity onPress={pickImage} style={[s.avatarWrap, { borderColor: border, backgroundColor: surface }]}>
-        {avatarUri ? (
-          <Image source={{ uri: avatarUri }} style={s.avatarImage} />
-        ) : (
-          <View style={[s.avatarPlaceholder, { backgroundColor: PRIMARY + "20" }]}>
-            <Text style={[s.avatarInitial, { color: PRIMARY }]}>{initial}</Text>
-          </View>
-        )}
-        <View style={[s.avatarBadge, { backgroundColor: PRIMARY, borderColor: surface }]}>
+      <View style={s.avatarContainer}>
+        <TouchableOpacity onPress={pickImage} style={[s.avatarWrap, { borderColor: border, backgroundColor: surface }]}>
+          {avatarUri ? (
+            <Image source={{ uri: avatarUri }} style={s.avatarImage} />
+          ) : (
+            <View style={[s.avatarPlaceholder, { backgroundColor: PRIMARY + "20" }]}>
+              <Text style={[s.avatarInitial, { color: PRIMARY }]}>{initial}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity onPress={pickImage} style={[s.avatarBadge, { backgroundColor: PRIMARY, borderColor: surface }]}>
           <Ionicons name="camera" size={14} color="#fff" />
-        </View>
-      </TouchableOpacity>
+        </TouchableOpacity>
+      </View>
 
       {avatarBase64 ? (
         <TouchableOpacity
@@ -190,18 +200,28 @@ const s = StyleSheet.create({
   scroll: { flex: 1 },
   content: { padding: 16 },
   title: { fontSize: 20, fontWeight: "700", marginBottom: 16 },
+  avatarContainer: { position: "relative", marginBottom: 16, alignSelf: "flex-start" },
   avatarWrap: {
     width: 88,
     height: 88,
     borderRadius: 44,
     borderWidth: 2,
-    marginBottom: 16,
     overflow: "hidden",
   },
   avatarImage: { width: "100%", height: "100%" },
   avatarPlaceholder: { width: "100%", height: "100%", alignItems: "center", justifyContent: "center" },
   avatarInitial: { fontSize: 28, fontWeight: "800" },
-  avatarBadge: { position: "absolute", right: -2, bottom: -2, width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", borderWidth: 2 },
+  avatarBadge: {
+    position: "absolute",
+    right: -2,
+    bottom: -2,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+  },
   uploadBtn: {
     flexDirection: "row",
     alignItems: "center",

@@ -18,7 +18,7 @@ import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAppTheme } from "../context/ThemeContext";
 import { useAlert } from "../context/AlertContext";
-import { API_URL, getBottomInset } from "../constants/config";
+import { API_URL, getContentBottomInset } from "../constants/config";
 import { authApi } from "../services/api";
 import { useAuthStore } from "../store/auth";
 import {
@@ -265,7 +265,7 @@ export default function LoginScreen() {
       await sendPasswordReset(e);
       alert.show(
         "Check your email",
-        "We sent a password reset link to your email. Check your inbox and spam folder.",
+        "We sent a password reset link to " + e + ". Open the email and tap the link (use it within 1 hour; open in your browser). If it says \"expired or already used\", come back here and tap \"Send reset link\" again to get a new one.",
         undefined,
         "success"
       );
@@ -285,7 +285,7 @@ export default function LoginScreen() {
   }
 
   return (
-    <View style={[s.root, { backgroundColor: bg, paddingTop: insets.top, paddingBottom: getBottomInset(insets.bottom) }]}>
+    <View style={[s.root, { backgroundColor: bg, paddingTop: insets.top, paddingBottom: getContentBottomInset(insets.bottom) }]}>
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -333,6 +333,11 @@ export default function LoginScreen() {
                 style={[s.input, { color: textColor }]}
               />
             </View>
+            {mode === "forgot" && (
+              <Text style={[s.forgotHint, { color: subColor }]}>
+                We'll send a link to reset your password. Use it within 1 hour and open in your browser.
+              </Text>
+            )}
 
             {mode === "signup" && (
               <>
@@ -562,6 +567,7 @@ const s = StyleSheet.create({
   mobilePrefix: { fontSize: 16, fontWeight: "600", marginRight: 2 },
   passwordToggle: { paddingLeft: 8 },
   forgotLink: { alignSelf: "flex-end", marginTop: 12 },
+  forgotHint: { fontSize: 12, marginTop: 8, marginBottom: 4 },
   linkText: { fontSize: 14, fontWeight: "600" },
   primaryButton: {
     backgroundColor: PRIMARY,

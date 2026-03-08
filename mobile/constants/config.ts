@@ -48,13 +48,21 @@ export const USE_MOCK_OTP =
 /** India: mobile number must be exactly 10 digits (after +91) */
 export const INDIA_MOBILE_LENGTH = 10;
 
-/** Minimum bottom inset for Android so app content never touches system nav (home, back, recent). Ensures tab bar and content sit clearly above. */
-export const ANDROID_NAV_BAR_FALLBACK = 48;
+/** Minimum bottom inset for Android so tab bar / content never touches system nav (home, back, recent). */
+export const ANDROID_NAV_BAR_FALLBACK = 56;
 
-/** Returns bottom inset, using fallback on Android when SafeArea reports 0. */
+/** Returns bottom inset, using fallback on Android when SafeArea reports 0. Use for tab bar and main app content. */
 export function getBottomInset(bottom: number): number {
   return Math.max(bottom, Platform.OS === 'android' ? ANDROID_NAV_BAR_FALLBACK : 0);
 }
 
+/** Smaller bottom inset for login/register so there's no large grey strip above system nav. */
+export function getContentBottomInset(bottom: number): number {
+  return Math.max(bottom, Platform.OS === 'android' ? 12 : 0);
+}
+
 /** Public privacy policy URL (required for store listings; also used in-app for "View full policy"). */
 export const PRIVACY_POLICY_URL = 'https://allpixel.in/privacy%20policy.html';
+
+/** Where to send user after completing password reset (must be in Firebase Auth → Authorized domains). */
+export const PASSWORD_RESET_CONTINUE_URL = 'https://allpixel.in/';
