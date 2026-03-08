@@ -20,7 +20,7 @@ const PRIMARY = "#E8751A";
 const CAT_COLORS: Record<string, string> = {
   activity: "#30D158", need: "#0A84FF", selling: "#FFD60A",
   meetup: "#BF5AF2", event: "#FF453A", study: "#32ADE6",
-  nightlife: "#E8751A", other: "#636366",
+  nightlife: "#E8751A", other: "#E8751A",
 };
 
 const EVENT_LIKE_CATEGORIES = new Set(["activity", "event", "meetup", "nightlife", "study"]);

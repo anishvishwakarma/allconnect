@@ -141,8 +141,8 @@ export default function EditProfileScreen() {
             <Text style={[s.avatarInitial, { color: PRIMARY }]}>{initial}</Text>
           </View>
         )}
-        <View style={[s.avatarBadge, { backgroundColor: PRIMARY }]}>
-          <Ionicons name="camera" size={16} color="#fff" />
+        <View style={[s.avatarBadge, { backgroundColor: PRIMARY, borderColor: surface }]}>
+          <Ionicons name="camera" size={14} color="#fff" />
         </View>
       </TouchableOpacity>
 
@@ -201,7 +201,7 @@ const s = StyleSheet.create({
   avatarImage: { width: "100%", height: "100%" },
   avatarPlaceholder: { width: "100%", height: "100%", alignItems: "center", justifyContent: "center" },
   avatarInitial: { fontSize: 28, fontWeight: "800" },
-  avatarBadge: { position: "absolute", right: 0, top: 0, width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  avatarBadge: { position: "absolute", right: -2, bottom: -2, width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", borderWidth: 2 },
   uploadBtn: {
     flexDirection: "row",
     alignItems: "center",

@@ -293,7 +293,7 @@ export default function LoginScreen() {
           keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
         >
           <ScrollView
-            contentContainerStyle={[s.scrollContent, { paddingTop: 32, paddingBottom: 24 }]}
+            contentContainerStyle={[s.scrollContent, { paddingTop: 16, paddingBottom: 16 }]}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
             bounces={false}
@@ -503,7 +503,7 @@ const s = StyleSheet.create({
   root: { flex: 1 },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: "flex-start",
+    justifyContent: "center",
     paddingHorizontal: 24,
   },
   brandArea: { alignItems: "center", marginBottom: 32 },

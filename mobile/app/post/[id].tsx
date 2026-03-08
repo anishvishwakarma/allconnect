@@ -160,12 +160,14 @@ export default function PostDetailScreen() {
           {post.privacy_type === 'approval' && <InfoRow icon="shield-checkmark-outline" label="Approval" value="Host approval required" catColor={catColor} surface={surface} text={text} sub={sub} border={border} />}
         </View>
 
-        {/* ── Event ended notice ── */}
+        {/* ── Event ended notice (matches app card style) ── */}
         {isEnded && (
           <View style={{ paddingHorizontal: 20, marginBottom: 16 }}>
-            <View style={[s.heroCard, { backgroundColor: isDark ? "#2A1A18" : "#FF453A12", borderColor: "#FF453A30", flexDirection: "row", alignItems: "center", gap: 10 }]}>
-              <Ionicons name="time-outline" size={20} color="#FF453A" />
-              <Text style={{ color: "#FF453A", fontSize: 14, fontWeight: "600" }}>This event has ended. Chat is read-only.</Text>
+            <View style={[s.heroCard, { backgroundColor: surface, borderColor: border, flexDirection: "row", alignItems: "center", gap: 10 }]}>
+              <View style={[s.sectionIcon, { backgroundColor: isDark ? "#2C2C2F" : "#E5E5EA" }]}>
+                <Ionicons name="time-outline" size={18} color={sub} />
+              </View>
+              <Text style={{ color: sub, fontSize: 14, fontWeight: "500", flex: 1 }}>This event has ended. You can still view the group chat as read-only.</Text>
             </View>
           </View>
         )}

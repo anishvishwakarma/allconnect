@@ -60,7 +60,12 @@ export default function MapScreen() {
   const [locationGranted, setLocationGranted] = useState(false);
   const [reqLoading, setReqLoading] = useState(false);
   const [reqDone, setReqDone] = useState(false);
+  const [mapLoadError, setMapLoadError] = useState(false);
+  const [mapReady, setMapReady] = useState(false);
+  const [mapKey, setMapKey] = useState(0);
+  const [locating, setLocating] = useState(false);
   const regionRef = useRef(region);
+  const mapLoadCheckRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   regionRef.current = region;
   const regionFetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mapRef = useRef<MapView>(null);
@@ -113,6 +118,7 @@ export default function MapScreen() {
   }
 
   async function getLocation() {
+    setLocating(true);
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
@@ -124,7 +130,11 @@ export default function MapScreen() {
         );
         return;
       }
-      const loc = await Location.getCurrentPositionAsync({});
+      // Use Balanced accuracy + accept cached position so "my location" returns in 1–3s instead of 10–30s (GPS-only)
+      const loc = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+        maximumAge: 15000, // use cache up to 15s old for instant response when possible
+      });
       const { latitude, longitude } = loc.coords;
       const nextRegion = { ...regionRef.current, latitude, longitude };
       scheduleFetchForRegion(nextRegion);
@@ -142,6 +152,8 @@ export default function MapScreen() {
       } else {
         alert.show("Location error", "Could not get your location. Try again later.", undefined, "error");
       }
+    } finally {
+      setLocating(false);
     }
   }
 
@@ -167,20 +179,39 @@ export default function MapScreen() {
     } finally { setReqLoading(false); }
   }
 
+  // If map doesn't signal ready within 12s, show "map couldn't load" (e.g. wrong API key or network)
+  useEffect(() => {
+    if (mapReady || mapLoadError) return;
+    mapLoadCheckRef.current = setTimeout(() => setMapLoadError(true), 12000);
+    return () => {
+      if (mapLoadCheckRef.current) clearTimeout(mapLoadCheckRef.current);
+    };
+  }, [mapReady, mapLoadError]);
+
   const bg = isDark ? "#0C0C0F" : "#F5F5F7";
   const surface = isDark ? "#1A1A1F" : "#FFFFFF";
   const text = isDark ? "#FFFFFF" : "#0C0C0F";
   const sub = isDark ? "#9A9A9E" : "#6E6E73";
   const border = isDark ? "#2C2C2F" : "#E5E5EA";
 
+  function retryMap() {
+    setMapLoadError(false);
+    setMapReady(false);
+    setMapKey((k) => k + 1);
+  }
+
   return (
-    <View style={{ flex: 1, backgroundColor: bg }}>
+    <View style={{ flex: 1, backgroundColor: bg, minHeight: SCREEN_H }}>
       <MapView
+        key={mapKey}
         ref={mapRef}
         provider={PROVIDER_GOOGLE}
-        style={StyleSheet.absoluteFillObject}
+        style={[StyleSheet.absoluteFillObject, { minHeight: SCREEN_H }]}
         region={region}
+        mapType="standard"
         onRegionChangeComplete={scheduleFetchForRegion}
+        onMapReady={() => { setMapReady(true); setMapLoadError(false); }}
+        onError={() => setMapLoadError(true)}
         showsUserLocation={locationGranted}
         showsMyLocationButton={false}
       >
@@ -208,6 +239,20 @@ export default function MapScreen() {
           </AnyMarker>
         ))}
       </MapView>
+
+      {/* ── Map load failed: show message + retry (e.g. APK missing key or wrong SHA-1) ── */}
+      {mapLoadError && (
+        <View style={[s.mapErrorCard, { backgroundColor: surface, borderColor: border }]}>
+          <Ionicons name="map-outline" size={28} color={sub} />
+          <Text style={[s.mapErrorTitle, { color: text }]}>Map couldn't load</Text>
+          <Text style={[s.mapErrorSub, { color: sub }]}>
+            Check your connection. If you're on the installed app, the map may need to be set up (see support).
+          </Text>
+          <TouchableOpacity onPress={retryMap} style={[s.mapErrorBtn, { backgroundColor: PRIMARY }]}>
+            <Text style={s.mapErrorBtnText}>Try again</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* ── Filter chips + Refresh ── */}
       <View style={[s.filtersContainer, { top: insets.top + 8 }]}>
@@ -242,12 +287,10 @@ export default function MapScreen() {
         </ScrollView>
       </View>
 
-      {/* ── Location FAB ── */}
-      {!locationGranted && (
-        <TouchableOpacity onPress={getLocation} style={[s.fab, { backgroundColor: surface, borderColor: border, right: 20, bottom: (selectedPin ? 220 : 100) + getBottomInset(insets.bottom) }]}>
-          <Ionicons name="locate-outline" size={20} color={PRIMARY} />
-        </TouchableOpacity>
-      )}
+      {/* ── Location FAB (always visible so user can re-center; tap to go to current location) ── */}
+      <TouchableOpacity onPress={getLocation} disabled={locating} style={[s.fab, { backgroundColor: surface, borderColor: border, right: 20, bottom: (selectedPin ? 220 : 100) + getBottomInset(insets.bottom) }]}>
+        {locating ? <ActivityIndicator size="small" color={PRIMARY} /> : <Ionicons name="locate-outline" size={20} color={PRIMARY} />}
+      </TouchableOpacity>
 
       {/* ── Loading indicator ── */}
       {loading && (
@@ -392,4 +435,24 @@ const s = StyleSheet.create({
     shadowColor: "#E8751A", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
   },
   primaryBtnText: { color: "#fff", fontWeight: "700", fontSize: 14 },
+  mapErrorCard: {
+    position: "absolute",
+    left: 20,
+    right: 20,
+    top: "30%",
+    padding: 20,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: "center",
+    gap: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  mapErrorTitle: { fontSize: 17, fontWeight: "700" },
+  mapErrorSub: { fontSize: 13, textAlign: "center", lineHeight: 18 },
+  mapErrorBtn: { paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12, marginTop: 4 },
+  mapErrorBtnText: { color: "#fff", fontWeight: "700", fontSize: 15 },
 });

@@ -48,8 +48,8 @@ export const USE_MOCK_OTP =
 /** India: mobile number must be exactly 10 digits (after +91) */
 export const INDIA_MOBILE_LENGTH = 10;
 
-/** Minimum bottom inset for Android when SafeArea reports 0 (software nav bar). Kept conservative so most screens are unchanged; use extra padding only on screens that overlap (e.g. Settings). */
-export const ANDROID_NAV_BAR_FALLBACK = 32;
+/** Minimum bottom inset for Android so app content never touches system nav (home, back, recent). Ensures tab bar and content sit clearly above. */
+export const ANDROID_NAV_BAR_FALLBACK = 48;
 
 /** Returns bottom inset, using fallback on Android when SafeArea reports 0. */
 export function getBottomInset(bottom: number): number {
