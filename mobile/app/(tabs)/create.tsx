@@ -23,6 +23,20 @@ const CAT_COLORS: Record<string, string> = {
   nightlife: "#E8751A", other: "#636366",
 };
 
+const EVENT_LIKE_CATEGORIES = new Set(["activity", "event", "meetup", "nightlife", "study"]);
+function getDurationLabel(cat: string): string {
+  if (cat === "selling") return "How long available (min)";
+  if (cat === "need") return "How long you need it (min)";
+  if (EVENT_LIKE_CATEGORIES.has(cat)) return "Duration of event (min)";
+  return "Duration (min)";
+}
+function getDurationHint(cat: string): string {
+  if (cat === "selling") return "How long this listing is valid. Chat closes after this.";
+  if (cat === "need") return "How long you need help. Chat closes after this.";
+  if (EVENT_LIKE_CATEGORIES.has(cat)) return "How long the event lasts. Chat closes after this.";
+  return "How long this is active. Chat closes after this.";
+}
+
 export default function CreatePostScreen() {
   const insets = useSafeAreaInsets();
   const token = useAuthStore((s) => s.token);
@@ -330,7 +344,10 @@ export default function CreatePostScreen() {
         </Section>
 
         {/* Duration */}
-        <Section label="Duration (min)" icon="hourglass-outline" iconColor={sub} compact>
+        <Section label={getDurationLabel(category) || "Duration (min)"} icon="hourglass-outline" iconColor={sub} compact>
+          {category ? (
+            <Text style={[s.helperText, { color: sub, marginBottom: 8 }]}>{getDurationHint(category)}</Text>
+          ) : null}
           <TextInput
             value={durationMinutes} onChangeText={setDurationMinutes}
             keyboardType="number-pad" placeholder="60" placeholderTextColor={sub}

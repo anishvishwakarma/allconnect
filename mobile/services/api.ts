@@ -210,7 +210,7 @@ export const requestsApi = {
 export const chatsApi = {
   mine: () => request<GroupChat[]>('/api/chats/groups'),
   messages: (groupId: string) =>
-    request<Message[]>(`/api/chats/groups/${groupId}/messages`),
+    request<{ messages: Message[]; expired?: boolean }>(`/api/chats/groups/${groupId}/messages`),
   send: (groupId: string, body: string) =>
     request<Message>(`/api/chats/groups/${groupId}/messages`, {
       method: 'POST',

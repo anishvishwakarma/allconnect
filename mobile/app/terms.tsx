@@ -46,7 +46,7 @@ export default function TermsScreen() {
         </Text>
         <Text style={[s.heading, { color: text }]}>Contact</Text>
         <Text style={[s.body, { color: sub }]}>
-          For support or legal concerns, contact `support@allconnect.app`.
+          For support or legal concerns, contact contact@allpixel.in.
         </Text>
       </View>
     </ScrollView>

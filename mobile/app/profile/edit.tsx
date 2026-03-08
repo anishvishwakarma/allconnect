@@ -32,6 +32,7 @@ export default function EditProfileScreen() {
   const [email, setEmail] = useState("");
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [avatarBase64, setAvatarBase64] = useState<string | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [saving, setSaving] = useState(false);
   const { isDark } = useAppTheme();
   const alert = useAlert();
@@ -65,7 +66,7 @@ export default function EditProfileScreen() {
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.8,
@@ -75,6 +76,24 @@ export default function EditProfileScreen() {
       const asset = result.assets[0];
       setAvatarUri(asset.uri);
       setAvatarBase64(asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : null);
+    }
+  }
+
+  async function uploadImage() {
+    if (!avatarBase64) return;
+    setUploadingAvatar(true);
+    try {
+      const { avatar_uri } = await usersApi.uploadAvatar(avatarBase64);
+      setAvatarUri(avatar_uri);
+      setAvatarBase64(null);
+      updateUser({ avatar_uri });
+      alert.show("Uploaded", "Photo uploaded. Tap Save to update your profile.", undefined, "success");
+    } catch (err: any) {
+      const msg = err?.message || "Upload failed. Try again.";
+      const isStorage = msg.includes("Storage not configured") || msg.includes("Upload failed") || msg.includes("Image too large");
+      alert.show(isStorage ? "Photo upload issue" : "Something went wrong", msg, undefined, "error");
+    } finally {
+      setUploadingAvatar(false);
     }
   }
 
@@ -95,7 +114,14 @@ export default function EditProfileScreen() {
       alert.show("Saved", "Profile updated.", undefined, "success");
       router.back();
     } catch (err: any) {
-      alert.show("Something went wrong", "Could not save. Please try again.", undefined, "error");
+      const msg = err?.message || "Could not save. Please try again.";
+      const isStorage = msg.includes("Storage not configured") || msg.includes("Upload failed") || msg.includes("Image too large");
+      alert.show(
+        isStorage ? "Photo upload issue" : "Something went wrong",
+        msg,
+        undefined,
+        "error"
+      );
     } finally {
       setSaving(false);
     }
@@ -119,6 +145,23 @@ export default function EditProfileScreen() {
           <Ionicons name="camera" size={16} color="#fff" />
         </View>
       </TouchableOpacity>
+
+      {avatarBase64 ? (
+        <TouchableOpacity
+          onPress={uploadImage}
+          disabled={uploadingAvatar}
+          style={[s.uploadBtn, { backgroundColor: PRIMARY }]}
+        >
+          {uploadingAvatar ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <>
+              <Ionicons name="cloud-upload-outline" size={18} color="#fff" style={{ marginRight: 6 }} />
+              <Text style={s.uploadBtnText}>Upload photo</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      ) : null}
 
       <Text style={[s.label, { color: sub }]}>Name</Text>
       <TextInput
@@ -158,7 +201,18 @@ const s = StyleSheet.create({
   avatarImage: { width: "100%", height: "100%" },
   avatarPlaceholder: { width: "100%", height: "100%", alignItems: "center", justifyContent: "center" },
   avatarInitial: { fontSize: 28, fontWeight: "800" },
-  avatarBadge: { position: "absolute", right: 0, bottom: 0, width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  avatarBadge: { position: "absolute", right: 0, top: 0, width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  uploadBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    marginBottom: 16,
+    minWidth: 160,
+  },
+  uploadBtnText: { color: "#fff", fontSize: 15, fontWeight: "700" },
   label: { fontSize: 14, marginBottom: 4 },
   input: { borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, fontSize: 16, marginBottom: 16, borderWidth: 1 },
   btn: { borderRadius: 12, paddingVertical: 14, alignItems: "center" },

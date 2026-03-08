@@ -31,6 +31,7 @@ export default function CompleteProfileScreen() {
   const [email, setEmail] = useState(user?.email?.trim() || "");
   const [avatarUri, setAvatarUri] = useState<string | null>(user?.avatar_uri || null);
   const [avatarBase64, setAvatarBase64] = useState<string | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [saving, setSaving] = useState(false);
 
   if (!hasHydrated) {
@@ -55,7 +56,7 @@ export default function CompleteProfileScreen() {
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.8,
@@ -65,6 +66,23 @@ export default function CompleteProfileScreen() {
       const asset = result.assets[0];
       setAvatarUri(asset.uri);
       setAvatarBase64(asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : null);
+    }
+  }
+
+  async function uploadImage() {
+    if (!avatarBase64) return;
+    setUploadingAvatar(true);
+    try {
+      const { avatar_uri } = await usersApi.uploadAvatar(avatarBase64);
+      setAvatarUri(avatar_uri);
+      setAvatarBase64(null);
+      alert.show("Uploaded", "Photo uploaded. Tap Continue to save your profile.", undefined, "success");
+    } catch (err: any) {
+      const msg = err?.message || "Upload failed. Try again.";
+      const isStorage = msg.includes("Storage not configured") || msg.includes("Upload failed") || msg.includes("Image too large");
+      alert.show(isStorage ? "Photo upload issue" : "Something went wrong", msg, undefined, "error");
+    } finally {
+      setUploadingAvatar(false);
     }
   }
 
@@ -91,7 +109,14 @@ export default function CompleteProfileScreen() {
       });
       router.replace("/(tabs)/map");
     } catch (err: any) {
-      alert.show("Something went wrong", "Could not save. Please try again.", undefined, "error");
+      const msg = err?.message || "Could not save. Please try again.";
+      const isStorage = msg.includes("Storage not configured") || msg.includes("Upload failed") || msg.includes("Image too large");
+      alert.show(
+        isStorage ? "Photo upload issue" : "Something went wrong",
+        msg,
+        undefined,
+        "error"
+      );
     } finally {
       setSaving(false);
     }
@@ -100,7 +125,7 @@ export default function CompleteProfileScreen() {
   const initial = getInitials(name || user?.name);
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: bg }} contentContainerStyle={[s.content, { paddingTop: insets.top + 24, paddingBottom: getBottomInset(insets.bottom) + 48 }]} keyboardShouldPersistTaps="handled">
+    <ScrollView style={{ flex: 1, backgroundColor: bg }} contentContainerStyle={[s.content, { paddingTop: insets.top + 24, paddingBottom: getBottomInset(insets.bottom) + 24 }]} keyboardShouldPersistTaps="handled">
       <Text style={[s.title, { color: text }]}>Complete your profile</Text>
       <Text style={[s.subtitle, { color: sub }]}>Add your name and optional photo.</Text>
 
@@ -116,6 +141,23 @@ export default function CompleteProfileScreen() {
           <Ionicons name="camera" size={16} color="#fff" />
         </View>
       </TouchableOpacity>
+
+      {avatarBase64 ? (
+        <TouchableOpacity
+          onPress={uploadImage}
+          disabled={uploadingAvatar}
+          style={[s.uploadBtn, { backgroundColor: PRIMARY, borderColor: border }]}
+        >
+          {uploadingAvatar ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <>
+              <Ionicons name="cloud-upload-outline" size={18} color="#fff" style={{ marginRight: 6 }} />
+              <Text style={s.uploadBtnText}>Upload photo</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      ) : null}
 
       <Text style={[s.label, { color: sub }]}>Full name *</Text>
       <TextInput
@@ -159,7 +201,19 @@ const s = StyleSheet.create({
   avatarImage: { width: "100%", height: "100%" },
   avatarPlaceholder: { width: "100%", height: "100%", alignItems: "center", justifyContent: "center" },
   avatarInitial: { fontSize: 40, fontWeight: "800" },
-  avatarBadge: { position: "absolute", right: 4, bottom: 4, width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  avatarBadge: { position: "absolute", right: 4, top: 4, width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  uploadBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    marginBottom: 20,
+    minWidth: 160,
+  },
+  uploadBtnText: { color: "#fff", fontSize: 15, fontWeight: "700" },
   label: { fontSize: 12, fontWeight: "600", marginBottom: 6 },
   input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, fontSize: 16, marginBottom: 16 },
   btn: { borderRadius: 14, paddingVertical: 16, alignItems: "center", marginTop: 8 },

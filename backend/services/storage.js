@@ -49,7 +49,10 @@ async function uploadAvatar(userId, base64Data) {
     });
   if (error) {
     console.error('Supabase avatar upload error:', error);
-    throw new Error('Upload failed');
+    const hint = error.message && /not found|bucket|exist/i.test(error.message)
+      ? ' Photo storage may not be set up yet — create an "avatars" bucket in Supabase Storage (see backend docs).'
+      : '';
+    throw new Error('Upload failed.' + hint);
   }
   const { data: urlData } = client.storage.from(BUCKET).getPublicUrl(data.path);
   return urlData?.publicUrl || null;

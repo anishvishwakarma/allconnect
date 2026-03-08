@@ -2,7 +2,6 @@ import { useEffect } from "react";
 import { Stack, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import Constants from "expo-constants";
-import * as Notifications from "expo-notifications";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ThemeProvider, useAppTheme } from "../context/ThemeContext";
 import { AlertProvider } from "../context/AlertContext";
@@ -14,6 +13,8 @@ function RootStack() {
 
   useEffect(() => {
     if (!hasHydrated) return;
+    // Skip in Expo Go — push notifications removed in SDK 53; avoids "expo-notifications" console error
+    if (Constants.appOwnership === "expo") return;
 
     function navigateFromNotification(data: Record<string, unknown> | undefined) {
       if (!token) return;
@@ -27,19 +28,24 @@ function RootStack() {
       }
     }
 
-    Notifications.getLastNotificationResponseAsync()
-      .then((response) => {
-        const data = response?.notification.request.content.data as Record<string, unknown> | undefined;
+    let subscription: { remove: () => void } | null = null;
+    import("expo-notifications").then((Notifications) => {
+      const Notifs = Notifications.default ?? Notifications;
+      Notifs.getLastNotificationResponseAsync?.()
+        ?.then((response) => {
+          const data = response?.notification.request.content.data as Record<string, unknown> | undefined;
+          navigateFromNotification(data);
+        })
+        .catch(() => {});
+      subscription = Notifs.addNotificationResponseReceivedListener?.((response) => {
+        const data = response.notification.request.content.data as Record<string, unknown> | undefined;
         navigateFromNotification(data);
-      })
-      .catch(() => {});
+      }) ?? null;
+    }).catch(() => {});
 
-    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
-      const data = response.notification.request.content.data as Record<string, unknown> | undefined;
-      navigateFromNotification(data);
-    });
-
-    return () => subscription.remove();
+    return () => {
+      subscription?.remove();
+    };
   }, [hasHydrated, token]);
 
   useEffect(() => {

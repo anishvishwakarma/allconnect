@@ -61,11 +61,14 @@ router.post('/avatar', async (req, res) => {
     if (!image || typeof image !== 'string') {
       return res.status(400).json({ error: 'image (base64) required' });
     }
+    const SAFE_AVATAR_MESSAGES = ['Image too large', 'Upload failed', 'Storage not configured', 'bucket', 'set up'];
     let url;
     try {
       url = await uploadAvatar(req.userId, image);
     } catch (err) {
-      return res.status(400).json({ error: err.message || 'Upload failed' });
+      const msg = err && typeof err.message === 'string' ? err.message : '';
+      const safe = SAFE_AVATAR_MESSAGES.some((s) => msg.includes(s)) ? msg : 'Upload failed';
+      return res.status(400).json({ error: safe });
     }
     if (!url) {
       return res.status(503).json({ error: 'Storage not configured' });

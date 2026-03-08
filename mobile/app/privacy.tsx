@@ -1,8 +1,8 @@
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View, Linking } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { getBottomInset } from "../constants/config";
+import { getBottomInset, PRIVACY_POLICY_URL } from "../constants/config";
 import { useAppTheme } from "../context/ThemeContext";
 
 export default function PrivacyScreen() {
@@ -13,6 +13,7 @@ export default function PrivacyScreen() {
   const text = isDark ? "#FFFFFF" : "#0C0C0F";
   const sub = isDark ? "#9A9A9E" : "#6E6E73";
   const border = isDark ? "#2C2C2F" : "#E5E5EA";
+  const PRIMARY = "#E8751A";
 
   return (
     <ScrollView
@@ -46,8 +47,12 @@ export default function PrivacyScreen() {
         </Text>
         <Text style={[s.heading, { color: text }]}>Contact</Text>
         <Text style={[s.body, { color: sub }]}>
-          For privacy requests or questions, contact `support@allconnect.app`.
+          For privacy requests or questions, contact contact@allpixel.in.
         </Text>
+        <TouchableOpacity onPress={() => Linking.openURL(PRIVACY_POLICY_URL)} style={s.linkRow}>
+          <Ionicons name="open-outline" size={18} color={PRIMARY} />
+          <Text style={[s.linkText, { color: PRIMARY }]}>View full policy online</Text>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );
@@ -72,4 +77,6 @@ const s = StyleSheet.create({
   },
   heading: { fontSize: 16, fontWeight: "700", marginTop: 6 },
   body: { fontSize: 14, lineHeight: 21 },
+  linkRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 16, paddingVertical: 8 },
+  linkText: { fontSize: 14, fontWeight: "600" },
 });

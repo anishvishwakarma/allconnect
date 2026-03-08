@@ -59,6 +59,10 @@ module.exports = {
       bundleIdentifier: "com.allconnect.app",
       buildNumber: "1",
       config: { googleMapsApiKey: mapsApiKey },
+      infoPlist: {
+        NSPhotoLibraryUsageDescription: "AllConnect needs photo access to set your profile picture.",
+        NSLocationWhenInUseUsageDescription: "AllConnect uses your location to show nearby events and add your post location on the map.",
+      },
     },
     android: {
       adaptiveIcon: {
@@ -71,6 +75,14 @@ module.exports = {
         googleMaps: { apiKey: mapsApiKey },
       },
     },
-    plugins: ["expo-router", "expo-location", "expo-notifications", "@react-native-community/datetimepicker"],
+    plugins: [
+      "expo-router",
+      [
+        "expo-location",
+        { locationWhenInUsePermission: "AllConnect uses your location to show nearby events and add your post location on the map." },
+      ],
+      "expo-notifications",
+      "@react-native-community/datetimepicker",
+    ],
   },
 };

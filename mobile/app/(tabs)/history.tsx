@@ -18,6 +18,16 @@ const CAT_COLORS: Record<string, string> = {
   nightlife: "#E8751A", other: "#636366",
 };
 
+/** True if post is ended (by status or past event_at + duration). */
+function isPostExpired(item: { status?: string; event_at?: string; eventAt?: string; duration_minutes?: number; durationMinutes?: number }): boolean {
+  if (item.status === "closed" || item.status === "expired" || item.status === "cancelled") return true;
+  const at = item.event_at ?? item.eventAt;
+  if (!at) return false;
+  const duration = item.duration_minutes ?? item.durationMinutes ?? 60;
+  const endMs = new Date(at).getTime() + duration * 60 * 1000;
+  return endMs < Date.now();
+}
+
 export default function HistoryScreen() {
   const insets = useSafeAreaInsets();
   const token = useAuthStore((s) => s.token);
@@ -81,7 +91,7 @@ export default function HistoryScreen() {
           renderItem={({ item }) => {
             const catColor = CAT_COLORS[item.category] || PRIMARY;
             const isCreated = item.role === "created" || item.host_id === user?.id;
-            const expired = item.status === "closed" || item.status === "expired" || item.status === "cancelled";
+            const expired = isPostExpired(item);
             return (
               <TouchableOpacity
                 onPress={() => router.push(`/post/${item.id}`)}
@@ -111,7 +121,9 @@ export default function HistoryScreen() {
                   </View>
                   <View style={[s.statusRow]}>
                     <View style={[s.statusDot, { backgroundColor: expired ? "#636366" : "#30D158" }]} />
-                    <Text style={[s.statusText, { color: expired ? "#636366" : "#30D158" }]}>{item.status}</Text>
+                    <Text style={[s.statusText, { color: expired ? "#636366" : "#30D158" }]}>
+                      {expired ? "Ended" : (item.status === "full" ? "Full" : item.status || "Open")}
+                    </Text>
                   </View>
                 </View>
                 <Ionicons name="chevron-forward" size={16} color={isDark ? "#3C3C3F" : "#C7C7CC"} />

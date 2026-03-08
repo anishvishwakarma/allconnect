@@ -29,18 +29,18 @@ export function getSocket(): Socket {
   });
 
   socket.on('connect', () => {
-    console.log('🔌 Socket connected:', socket?.id);
+    if (__DEV__) console.log('🔌 Socket connected:', socket?.id);
     for (const roomId of joinedRooms) {
       socket?.emit('chat:join', roomId);
     }
   });
 
   socket.on('connect_error', (err) => {
-    console.warn('Socket connect error:', err.message);
+    if (__DEV__) console.warn('Socket connect error:', err.message);
   });
 
   socket.on('disconnect', (reason) => {
-    console.log('Socket disconnected:', reason);
+    if (__DEV__) console.log('Socket disconnected:', reason);
   });
 
   return socket;

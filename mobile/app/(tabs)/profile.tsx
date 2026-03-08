@@ -86,7 +86,7 @@ export default function ProfileScreen() {
   const initial = getInitials(user?.name);
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: bg }} contentContainerStyle={{ paddingBottom: getBottomInset(insets.bottom) + 48 }} showsVerticalScrollIndicator={false}>
+    <ScrollView style={{ flex: 1, backgroundColor: bg }} contentContainerStyle={{ paddingBottom: getBottomInset(insets.bottom) + 24 }} showsVerticalScrollIndicator={false}>
       {/* Header */}
       <View style={[s.header, { borderBottomColor: border, paddingTop: insets.top + 16 }]}>
         <Text style={[s.title, { color: text }]}>Profile</Text>
@@ -121,7 +121,7 @@ export default function ProfileScreen() {
         <Text style={[s.phoneText, { color: sub }]}>{user?.email || (user?.mobile?.startsWith?.("email:") ? user.mobile.replace("email:", "") : user?.mobile)}</Text>
         <View style={[s.privacyBadge, { backgroundColor: isDark ? "#252528" : "#F0F0F3" }]}>
           <Ionicons name="eye-off-outline" size={12} color={sub} />
-          <Text style={[s.privacyText, { color: sub }]}>Identity hidden until approved</Text>
+          <Text style={[s.privacyText, { color: sub }]}>Only hosts see your name when you request to join</Text>
         </View>
       </View>
 

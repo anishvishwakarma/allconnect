@@ -84,8 +84,10 @@ export default function ChatScreen() {
 
   async function loadMessages(): Promise<boolean> {
     try {
-      const msgs = await chatsApi.messages(id);
-      setMessages(msgs);
+      const res = await chatsApi.messages(id);
+      const list = res?.messages ?? (Array.isArray(res) ? res : []);
+      setMessages(list);
+      if (res && typeof res === "object" && !Array.isArray(res) && res.expired) setExpired(true);
       setTimeout(() => flatRef.current?.scrollToEnd({ animated: false }), 80);
       return true;
     } catch (err: any) {

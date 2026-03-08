@@ -31,12 +31,8 @@ export const useAuthStore = create<AuthState>()(
           };
           disconnectSocket?.();
         } catch {}
-        try {
-          const { unregisterPushTokenWithBackend } = require('../services/pushNotifications') as {
-            unregisterPushTokenWithBackend?: (authToken?: string | null) => Promise<void>;
-          };
-          void unregisterPushTokenWithBackend?.(currentToken);
-        } catch {}
+        // Dynamic import so pushNotifications (and expo-notifications) are not in main bundle — avoids Expo Go ERROR on load
+        import('../services/pushNotifications').then((m) => m.unregisterPushTokenWithBackend?.(currentToken)).catch(() => {});
         try {
           const { signOutFirebase } = require('../services/firebaseAuth') as {
             signOutFirebase?: () => Promise<void>;

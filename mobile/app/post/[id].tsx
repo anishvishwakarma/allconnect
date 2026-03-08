@@ -115,7 +115,11 @@ export default function PostDetailScreen() {
   }
 
   const catColor = CATEGORY_COLORS[post.category] || PRIMARY;
-  const isActive = post.status === "open" || post.status === "active";
+  const eventEndMs = new Date(post.event_at || post.eventAt).getTime() + ((post.duration_minutes ?? post.durationMinutes) ?? 60) * 60 * 1000;
+  const isExpiredByTime = eventEndMs < Date.now();
+  const isStatusEnded = post.status === "closed" || post.status === "expired" || post.status === "cancelled";
+  const isEnded = isExpiredByTime || isStatusEnded;
+  const isActive = !isEnded && (post.status === "open" || post.status === "active");
   const pendingCount = requests.filter((r: any) => r.status === "pending").length;
 
   return (
@@ -128,7 +132,9 @@ export default function PostDetailScreen() {
           </TouchableOpacity>
           <View style={[s.statusPill, { backgroundColor: isActive ? "#30D15820" : "#63636320" }]}>
             <View style={[s.statusDot, { backgroundColor: isActive ? "#30D158" : "#636366" }]} />
-            <Text style={[s.statusText, { color: isActive ? "#30D158" : "#636366" }]}>{post.status}</Text>
+            <Text style={[s.statusText, { color: isActive ? "#30D158" : "#636366" }]}>
+              {isEnded ? "Ended" : (post.status === "full" ? "Full" : post.status)}
+            </Text>
           </View>
         </View>
 
@@ -154,19 +160,29 @@ export default function PostDetailScreen() {
           {post.privacy_type === 'approval' && <InfoRow icon="shield-checkmark-outline" label="Approval" value="Host approval required" catColor={catColor} surface={surface} text={text} sub={sub} border={border} />}
         </View>
 
+        {/* ── Event ended notice ── */}
+        {isEnded && (
+          <View style={{ paddingHorizontal: 20, marginBottom: 16 }}>
+            <View style={[s.heroCard, { backgroundColor: isDark ? "#2A1A18" : "#FF453A12", borderColor: "#FF453A30", flexDirection: "row", alignItems: "center", gap: 10 }]}>
+              <Ionicons name="time-outline" size={20} color="#FF453A" />
+              <Text style={{ color: "#FF453A", fontSize: 14, fontWeight: "600" }}>This event has ended. Chat is read-only.</Text>
+            </View>
+          </View>
+        )}
+
         {/* ── Group chat button (when user is approved) ── */}
         {groupChatId && (
           <View style={{ paddingHorizontal: 20, marginBottom: 20 }}>
             <TouchableOpacity onPress={() => router.push(`/chat/${groupChatId}`)} style={[s.chatBtn, { backgroundColor: catColor }]}>
               <Ionicons name="chatbubbles" size={18} color="#fff" />
-              <Text style={s.chatBtnText}>Open Group Chat</Text>
+              <Text style={s.chatBtnText}>{isEnded ? "View group chat (read-only)" : "Open Group Chat"}</Text>
               <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.7)" />
             </TouchableOpacity>
           </View>
         )}
 
-        {/* ── Host: manage requests ── */}
-        {isHost && (
+        {/* ── Host: manage requests (only when not ended) ── */}
+        {isHost && !isEnded && (
           <View style={{ paddingHorizontal: 20, marginBottom: 20 }}>
             <View style={[s.sectionHeader]}>
               <View style={[s.sectionIcon, { backgroundColor: PRIMARY + "18" }]}>

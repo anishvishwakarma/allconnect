@@ -129,6 +129,20 @@ app.on('chat:new_message', ({ groupId, message }) => {
   })();
 });
 
+// Mark posts as expired when event_at + duration_minutes has passed (keeps History/Chat/Map consistent)
+const EXPIRY_CRON_MS = 5 * 60 * 1000; // 5 minutes
+function runExpiryCron() {
+  db.pool.query(
+    `UPDATE posts SET status = 'expired'
+     WHERE status IN ('open', 'full')
+       AND (event_at + (COALESCE(duration_minutes, 60) * interval '1 minute')) < NOW()`
+  ).then((res) => {
+    if (res.rowCount > 0) console.log(`[cron] Marked ${res.rowCount} post(s) as expired`);
+  }).catch((err) => console.error('[cron] post expiry', err.message));
+}
+setInterval(runExpiryCron, EXPIRY_CRON_MS);
+runExpiryCron();
+
 const PORT = process.env.PORT || 4000;
 server.listen(PORT, () => {
   console.log(`AllConnect API + Socket.io listening on http://localhost:${PORT}`);

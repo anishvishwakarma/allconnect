@@ -49,7 +49,7 @@ export default function HelpScreen() {
 
         <Text style={[s.heading, { color: text }]}>Need support?</Text>
         <Text style={[s.body, { color: sub }]}>
-          Contact us at `support@allconnect.app` for login issues, account deletion help, or reportable abuse.
+          Contact us at contact@allpixel.in for login issues, account deletion help, or reportable abuse.
         </Text>
       </View>
     </ScrollView>

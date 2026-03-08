@@ -119,10 +119,13 @@ export default function SettingsScreen() {
     }
   }
 
+  // Extra bottom padding only here (and any other screen with nav bar overlap); global fallback stays 32 so other screens are unchanged
+  const bottomPadding = getBottomInset(insets.bottom) + 48;
+
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: bg }}
-      contentContainerStyle={{ paddingBottom: getBottomInset(insets.bottom) + 24 }}
+      contentContainerStyle={{ paddingBottom: bottomPadding }}
       showsVerticalScrollIndicator={false}
     >
       <View style={[s.header, { paddingTop: insets.top + 12, borderBottomColor: border }]}>
@@ -212,7 +215,7 @@ export default function SettingsScreen() {
           </TouchableOpacity>
           <View style={[s.separator, { backgroundColor: border }]} />
           <TouchableOpacity
-            onPress={() => openUrl("mailto:support@allconnect.app", "Contact")}
+            onPress={() => openUrl("mailto:contact@allpixel.in", "Contact")}
             style={s.row}
           >
             <Ionicons name="mail-outline" size={20} color={sub} />

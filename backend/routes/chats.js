@@ -45,7 +45,7 @@ router.get('/groups', authMiddleware, async (req, res) => {
   }
 });
 
-// GET /api/chats/groups/:groupId/messages
+// GET /api/chats/groups/:groupId/messages (allowed when chat expired — read-only)
 router.get('/groups/:groupId/messages', authMiddleware, async (req, res) => {
   try {
     const groupId = req.params.groupId;
@@ -56,9 +56,7 @@ router.get('/groups/:groupId/messages', authMiddleware, async (req, res) => {
     if (!member) return res.status(403).json({ error: 'Not a member of this chat' });
     const group = await db.row('SELECT expires_at FROM group_chats WHERE id = $1', [groupId]);
     if (!group) return res.status(404).json({ error: 'Chat not found' });
-    if (new Date(group.expires_at) < new Date()) {
-      return res.status(410).json({ error: 'Chat expired' });
-    }
+    // Allow loading messages for expired chats so users can read history (POST still blocks sending)
     const rows = await db.rows(
       `SELECT m.*, u.name AS user_name
        FROM messages m
@@ -67,7 +65,8 @@ router.get('/groups/:groupId/messages', authMiddleware, async (req, res) => {
        ORDER BY m.created_at ASC`,
       [groupId]
     );
-    return res.json(rows.map(messageRowToJson));
+    const expired = new Date(group.expires_at) < new Date();
+    return res.json({ messages: rows.map(messageRowToJson), expired });
   } catch (err) {
     console.error('chats/messages', err);
     return res.status(500).json({ error: 'Server error' });

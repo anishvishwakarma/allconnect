@@ -82,8 +82,11 @@ export default function MapScreen() {
       const sun = new Date(sat); sun.setDate(sat.getDate()+1); sun.setHours(23,59,59);
       params.from = sat.toISOString(); params.to = sun.toISOString();
     }
-    try { setPins(await postsApi.nearby(latitude, longitude, 15, params)); }
-    catch {}
+    try {
+      setPins(await postsApi.nearby(latitude, longitude, 15, params));
+    } catch {
+      // Keep previous pins on network/API failure; loading state cleared below
+    }
     finally { setLoading(false); }
   }, [filter]);
 
