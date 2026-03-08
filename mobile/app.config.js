@@ -1,3 +1,9 @@
+// Load .env so "eas build" and "expo config" see EXPO_PUBLIC_* when run locally; EAS cloud injects secrets
+const path = require('path');
+try {
+  require('dotenv').config({ path: path.resolve(__dirname, '.env') });
+} catch (_) {}
+
 const mapsApiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || "";
 
 // Firebase config — set in .env (local) and EAS Secrets (production). No keys in repo.
