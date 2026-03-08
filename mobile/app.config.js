@@ -4,7 +4,10 @@ try {
   require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 } catch (_) {}
 
+// Single key (Expo Go + fallback), or use platform-specific keys for EAS builds
 const mapsApiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || "";
+const mapsApiKeyAndroid = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY_ANDROID || mapsApiKey;
+const mapsApiKeyIos = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY_IOS || mapsApiKey;
 
 // Firebase config — set in .env (local) and EAS Secrets (production). No keys in repo.
 const firebase = {
@@ -64,7 +67,7 @@ module.exports = {
       supportsTablet: true,
       bundleIdentifier: "com.allconnect.app",
       buildNumber: "1",
-      config: { googleMapsApiKey: mapsApiKey },
+      config: { googleMapsApiKey: mapsApiKeyIos },
       infoPlist: {
         NSPhotoLibraryUsageDescription: "AllConnect needs photo access to set your profile picture.",
         NSLocationWhenInUseUsageDescription: "AllConnect uses your location to show nearby events and add your post location on the map.",
@@ -78,7 +81,7 @@ module.exports = {
       package: "com.allconnect.app",
       versionCode: 1,
       config: {
-        googleMaps: { apiKey: mapsApiKey },
+        googleMaps: { apiKey: mapsApiKeyAndroid },
       },
     },
     plugins: [

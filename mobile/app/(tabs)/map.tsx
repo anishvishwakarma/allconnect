@@ -130,10 +130,9 @@ export default function MapScreen() {
         );
         return;
       }
-      // Use Balanced accuracy + accept cached position so "my location" returns in 1–3s instead of 10–30s (GPS-only)
+      // Use Balanced accuracy so "my location" returns in 1–3s instead of 10–30s (GPS-only)
       const loc = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
-        maximumAge: 15000, // use cache up to 15s old for instant response when possible
       });
       const { latitude, longitude } = loc.coords;
       const nextRegion = { ...regionRef.current, latitude, longitude };
@@ -211,7 +210,6 @@ export default function MapScreen() {
         mapType="standard"
         onRegionChangeComplete={scheduleFetchForRegion}
         onMapReady={() => { setMapReady(true); setMapLoadError(false); }}
-        onError={() => setMapLoadError(true)}
         showsUserLocation={locationGranted}
         showsMyLocationButton={false}
       >
@@ -240,13 +238,13 @@ export default function MapScreen() {
         ))}
       </MapView>
 
-      {/* ── Map load failed: show message + retry (e.g. APK missing key or wrong SHA-1) ── */}
+      {/* ── Map load failed: show message + retry (e.g. APK: key in EAS production + SHA-1 in Google Cloud) ── */}
       {mapLoadError && (
         <View style={[s.mapErrorCard, { backgroundColor: surface, borderColor: border }]}>
           <Ionicons name="map-outline" size={28} color={sub} />
           <Text style={[s.mapErrorTitle, { color: text }]}>Map couldn't load</Text>
           <Text style={[s.mapErrorSub, { color: sub }]}>
-            Check your connection. If you're on the installed app, the map may need to be set up (see support).
+            Check your connection. If using the installed app: set the Maps key in EAS (Production) and add your app's SHA-1 to the API key in Google Cloud Console.
           </Text>
           <TouchableOpacity onPress={retryMap} style={[s.mapErrorBtn, { backgroundColor: PRIMARY }]}>
             <Text style={s.mapErrorBtnText}>Try again</Text>
