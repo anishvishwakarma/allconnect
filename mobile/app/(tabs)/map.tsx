@@ -207,6 +207,7 @@ export default function MapScreen() {
         ref={mapRef}
         provider={PROVIDER_GOOGLE}
         style={[StyleSheet.absoluteFillObject, { minHeight: SCREEN_H }]}
+        mapPadding={{ bottom: TAB_BAR_BASE_HEIGHT + getBottomInset(insets.bottom), top: 0, left: 0, right: 0 }}
         region={region}
         mapType="standard"
         onRegionChangeComplete={scheduleFetchForRegion}

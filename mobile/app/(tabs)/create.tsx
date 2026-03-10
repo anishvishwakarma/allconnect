@@ -10,7 +10,7 @@ import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { postsApi } from "../../services/api";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { getBottomInset } from "../../constants/config";
+import { getBottomInset, FREE_POST_LIMIT } from "../../constants/config";
 import { useAuthStore } from "../../store/auth";
 import { POST_CATEGORIES } from "../../types";
 import { useAppTheme } from "../../context/ThemeContext";
@@ -70,7 +70,7 @@ export default function CreatePostScreen() {
 
   const postsMonth = user?.posts_this_month ?? 0;
   const subEnd = user?.subscription_ends_at;
-  const freeRemaining = Math.max(0, 5 - postsMonth);
+  const freeRemaining = Math.max(0, FREE_POST_LIMIT - postsMonth);
   const hasSubscription = subEnd && new Date(subEnd) > new Date();
 
   function formatEventDate(value: Date | null) {
@@ -183,12 +183,10 @@ export default function CreatePostScreen() {
       alert.show("Invalid", "Enter a valid duration in minutes.", undefined, "info");
       return;
     }
-    if (!hasSubscription && freeRemaining <= 0) {
-      alert.show("Limit reached", "You've used your 5 free posts this month. Upgrade to Pro for unlimited posts.", undefined, "info");
-      return;
-    }
+    // Backend enforces monthly limit; front-end no longer hard-blocks at 5.
     setLoading(true);
     try {
+      const previousMonthPosts = user?.posts_this_month ?? 0;
       const post = await postsApi.create({
         title: title.trim(),
         description: description.trim() || undefined,
@@ -203,9 +201,14 @@ export default function CreatePostScreen() {
         privacy_type: approvalRequired ? "approval" : "public",
       });
       if (!hasSubscription) {
-        updateUser({ posts_this_month: (user?.posts_this_month ?? 0) + 1 });
+        const nextCount = previousMonthPosts + 1;
+        updateUser({ posts_this_month: nextCount });
       }
-      alert.show("Posted!", "Your post is live on the map.", [
+      const justUnlockedBonus = !hasSubscription && previousMonthPosts === 4;
+      const message = justUnlockedBonus
+        ? "Your post is live on the map. You've used your 5 free posts this month — we've added 15 bonus posts (20 total) for this month."
+        : "Your post is live on the map.";
+      alert.show("Posted!", message, [
         { text: "View Post", onPress: () => router.push(`/post/${post.id}`) },
         { text: "Explore Map", onPress: () => router.replace("/(tabs)/map") },
       ], "success");
@@ -294,7 +297,7 @@ export default function CreatePostScreen() {
         </Section>
 
         {/* Date/Time */}
-        <Section label="Date & Time" icon="calendar-outline" iconColor={PRIMARY} required compact>
+            <Section label="Date & Time" icon="calendar-outline" iconColor={PRIMARY} required compact>
           <Text style={[s.helperText, { color: sub }]}>Tap date, then choose time.</Text>
           <View style={{ flexDirection: "row", gap: 10 }}>
             <TouchableOpacity
@@ -341,19 +344,19 @@ export default function CreatePostScreen() {
               />
             </View>
           )}
-        </Section>
+            </Section>
 
         {/* Duration */}
         <Section label={getDurationLabel(category) || "Duration (min)"} icon="hourglass-outline" iconColor={sub} compact>
           {category ? (
             <Text style={[s.helperText, { color: sub, marginBottom: 8 }]}>{getDurationHint(category)}</Text>
           ) : null}
-          <TextInput
-            value={durationMinutes} onChangeText={setDurationMinutes}
-            keyboardType="number-pad" placeholder="60" placeholderTextColor={sub}
-            style={[s.input, { backgroundColor: inputBg, color: text, borderColor: border }]}
-          />
-        </Section>
+              <TextInput
+                value={durationMinutes} onChangeText={setDurationMinutes}
+                keyboardType="number-pad" placeholder="60" placeholderTextColor={sub}
+                style={[s.input, { backgroundColor: inputBg, color: text, borderColor: border }]}
+              />
+            </Section>
 
         {/* Cost + Max participants */}
         <View style={{ flexDirection: "row", gap: 12 }}>

@@ -170,7 +170,8 @@ router.post('/', authMiddleware, async (req, res) => {
         [req.userId]
       );
       const currentMonthPosts = countResult.rows[0]?.count ?? 0;
-      if (!hasSubscription && currentMonthPosts >= 5) {
+      // Free plan: 5 initial free posts + 15 bonus posts = 20 total per month
+      if (!hasSubscription && currentMonthPosts >= 20) {
         await client.query('ROLLBACK');
         return res.status(403).json({ error: 'Monthly free post limit reached' });
       }

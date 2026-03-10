@@ -10,7 +10,7 @@ import { useAuthStore } from "../../store/auth";
 import { disconnectSocket } from "../../services/socket";
 import { getInitials } from "../../utils/profile";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { getBottomInset } from "../../constants/config";
+import { getBottomInset, FREE_POST_LIMIT } from "../../constants/config";
 import { useAppTheme } from "../../context/ThemeContext";
 import { useAlert } from "../../context/AlertContext";
 
@@ -82,7 +82,7 @@ export default function ProfileScreen() {
   const subEnd = user?.subscription_ends_at;
   const postsMonth = user?.posts_this_month ?? 0;
   const hasSubscription = subEnd && new Date(subEnd) > new Date();
-  const freeRemaining = Math.max(0, 5 - postsMonth);
+  const freeRemaining = Math.max(0, FREE_POST_LIMIT - postsMonth);
   const initial = getInitials(user?.name);
 
   return (
@@ -200,8 +200,10 @@ export default function ProfileScreen() {
                 </>
               ) : (
                 <>
-                  <Text style={[s.fieldValue, { color: text }]}>Free · {freeRemaining}/{5} posts left</Text>
-                  <Text style={[s.fieldSub, { color: sub }]}>Resets 1st of every month</Text>
+                  <Text style={[s.fieldValue, { color: text }]}>
+                    Free · {Math.max(0, FREE_POST_LIMIT - postsMonth)}/{FREE_POST_LIMIT} posts left
+                  </Text>
+                  <Text style={[s.fieldSub, { color: sub }]}>First 5 posts are free; +15 bonus posts for this month. Resets 1st of every month.</Text>
                 </>
               )}
             </View>

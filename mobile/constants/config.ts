@@ -39,7 +39,8 @@ export const CATEGORY_COLORS: Record<string, string> = {
   other: '#E8751A',
 };
 
-export const FREE_POST_LIMIT = 5;
+/** Total posts allowed per month on free plan (5 initial + 15 bonus). */
+export const FREE_POST_LIMIT = 20;
 
 /** Use mock OTP when true; set EXPO_PUBLIC_USE_MOCK_OTP=false when backend OTP is live. */
 export const USE_MOCK_OTP =
