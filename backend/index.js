@@ -20,6 +20,9 @@ const server = http.createServer(app);
 app.set('trust proxy', 1);
 
 const corsOrigin = process.env.CORS_ORIGIN && process.env.CORS_ORIGIN.trim() ? process.env.CORS_ORIGIN.trim() : true;
+if (corsOrigin === true && process.env.NODE_ENV === 'production') {
+  console.warn('CORS_ORIGIN not set — all origins are allowed. Set CORS_ORIGIN in production for security.');
+}
 const io = new Server(server, {
   path: '/socket.io',
   cors: { origin: corsOrigin },

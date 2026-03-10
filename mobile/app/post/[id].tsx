@@ -339,7 +339,6 @@ const s = StyleSheet.create({
   reqAvatarText: { fontSize: 18, fontWeight: "800" },
   reqName: { fontSize: 15, fontWeight: "700" },
   reqPhone: { fontSize: 12, marginTop: 2 },
-  reqMsg: { marginTop: 10, padding: 10, borderRadius: 10 },
   rejectBtn: { flex: 1, borderWidth: 1, borderRadius: 12, paddingVertical: 12, alignItems: "center" },
   rejectText: { fontWeight: "600", fontSize: 14 },
   approveBtn: { flex: 1.5, backgroundColor: "#E8751A", borderRadius: 12, paddingVertical: 12, alignItems: "center", shadowColor: "#E8751A", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 3 },

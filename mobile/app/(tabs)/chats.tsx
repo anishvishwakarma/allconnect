@@ -6,17 +6,12 @@ import {
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { getBottomInset } from "../../constants/config";
+import { getBottomInset, CATEGORY_COLORS } from "../../constants/config";
 import { useAuthStore } from "../../store/auth";
 import { chatsApi } from "../../services/api";
 import { useAppTheme } from "../../context/ThemeContext";
 
 const PRIMARY = "#E8751A";
-const CAT_COLORS: Record<string, string> = {
-  activity: "#30D158", need: "#0A84FF", selling: "#FFD60A",
-  meetup: "#BF5AF2", event: "#FF453A", study: "#32ADE6",
-  nightlife: "#E8751A", other: "#E8751A",
-};
 
 export default function ChatsScreen() {
   const insets = useSafeAreaInsets();
@@ -87,7 +82,7 @@ export default function ChatsScreen() {
             </View>
           }
           renderItem={({ item }) => {
-            const catColor = CAT_COLORS[item.category] || PRIMARY;
+            const catColor = CATEGORY_COLORS[item.category] || PRIMARY;
             const expiresAt = item.expires_at ?? item.expiresAt;
             const remaining = timeRemaining(expiresAt);
             const isExpiringSoon = new Date(expiresAt).getTime() - Date.now() < 3600000;
@@ -152,6 +147,5 @@ const s = StyleSheet.create({
   catChip: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
   catChipText: { fontSize: 11, fontWeight: "600", textTransform: "capitalize" },
   meta: { fontSize: 12 },
-  dot: { fontSize: 12 },
   arrow: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },
 });

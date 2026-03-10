@@ -212,7 +212,7 @@ export default function ProfileScreen() {
             <>
               <View style={[s.separator, { backgroundColor: border }]} />
               <TouchableOpacity
-                onPress={() => alert.show("Coming soon", "Pro upgrade will be available soon. You can still create up to 5 free posts per month.", undefined, "info")}
+                onPress={() => alert.show("Coming soon", "Pro upgrade will be available soon. You get up to 20 free posts per month (5 free + 15 bonus).", undefined, "info")}
                 style={[s.upgradeBtn, { backgroundColor: PRIMARY + "12" }]}
               >
                 <Ionicons name="rocket-outline" size={16} color={PRIMARY} />

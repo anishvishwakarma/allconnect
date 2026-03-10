@@ -14,11 +14,11 @@ import { useAuthStore } from "../../store/auth";
 import { postsApi, requestsApi } from "../../services/api";
 import { useAppTheme } from "../../context/ThemeContext";
 import { useAlert } from "../../context/AlertContext";
-import { getBottomInset } from "../../constants/config";
+import { getBottomInset, CATEGORY_COLORS } from "../../constants/config";
 
 const PRIMARY = "#E8751A";
-const AUTO_REFRESH_INTERVAL_MS = 45000; // 45 seconds - auto-refresh to show new activities
-const TAB_BAR_BASE_HEIGHT = 56; // match (tabs) _layout tabBarStyle height
+const AUTO_REFRESH_INTERVAL_MS = 45000;
+const TAB_BAR_BASE_HEIGHT = 56;
 const { height: SCREEN_H } = Dimensions.get("window");
 
 const CATEGORIES = ["activity","need","selling","meetup","event","study","nightlife","other"] as const;
@@ -27,12 +27,6 @@ const WHEN_FILTERS = [
   { key: "tonight", label: "Tonight" },
   { key: "weekend", label: "Weekend" },
 ];
-
-const CAT_COLORS: Record<string, string> = {
-  activity: "#30D158", need: "#0A84FF", selling: "#FFD60A",
-  meetup: "#BF5AF2", event: "#FF453A", study: "#32ADE6",
-  nightlife: "#E8751A", other: "#E8751A",
-};
 
 function formatEventTime(iso?: string | null): string {
   if (!iso) return "—";
@@ -233,8 +227,8 @@ export default function MapScreen() {
               }
             }}
           >
-            <View style={[s.markerOuter, { borderColor: CAT_COLORS[pin.category] || PRIMARY }]}>
-              <View style={[s.markerInner, { backgroundColor: CAT_COLORS[pin.category] || PRIMARY }]} />
+            <View style={[s.markerOuter, { borderColor: CATEGORY_COLORS[pin.category] || PRIMARY }]}>
+              <View style={[s.markerInner, { backgroundColor: CATEGORY_COLORS[pin.category] || PRIMARY }]} />
             </View>
           </AnyMarker>
         ))}
@@ -278,9 +272,9 @@ export default function MapScreen() {
             <TouchableOpacity
               key={cat}
               onPress={() => { setLoading(true); setFilter((f) => ({ ...f, category: f.category === cat ? undefined : cat })); }}
-              style={[s.chip, { backgroundColor: filter.category === cat ? CAT_COLORS[cat] : surface, borderColor: filter.category === cat ? CAT_COLORS[cat] : border }]}
+              style={[s.chip, { backgroundColor: filter.category === cat ? CATEGORY_COLORS[cat] : surface, borderColor: filter.category === cat ? CATEGORY_COLORS[cat] : border }]}
             >
-              <View style={[s.catDot, { backgroundColor: CAT_COLORS[cat] || "#636366", opacity: filter.category === cat ? 0 : 1 }]} />
+              <View style={[s.catDot, { backgroundColor: CATEGORY_COLORS[cat] || "#636366", opacity: filter.category === cat ? 0 : 1 }]} />
               <Text style={[s.chipText, { color: filter.category === cat ? "#fff" : text }]} numberOfLines={1}>{cat}</Text>
             </TouchableOpacity>
           ))}
@@ -307,8 +301,8 @@ export default function MapScreen() {
           <View style={{ flexDirection: "row", alignItems: "flex-start", marginBottom: 12 }}>
             <View style={{ flex: 1 }}>
               <Text style={[s.pinTitle, { color: text }]} numberOfLines={2}>{selectedPin.title}</Text>
-              <View style={[s.catBadge, { backgroundColor: (CAT_COLORS[selectedPin.category] || PRIMARY) + "18" }]}>
-                <Text style={[s.catBadgeText, { color: CAT_COLORS[selectedPin.category] || PRIMARY }]}>
+              <View style={[s.catBadge, { backgroundColor: (CATEGORY_COLORS[selectedPin.category] || PRIMARY) + "18" }]}>
+                <Text style={[s.catBadgeText, { color: CATEGORY_COLORS[selectedPin.category] || PRIMARY }]}>
                   {selectedPin.category}
                 </Text>
               </View>

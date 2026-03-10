@@ -1,5 +1,9 @@
 const { Pool } = require('pg');
 
+if (!process.env.DATABASE_URL) {
+  console.error('DATABASE_URL is not set. The server will fail on the first database query.');
+}
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   max: 20,

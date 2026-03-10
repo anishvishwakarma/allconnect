@@ -6,17 +6,12 @@ import {
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { getBottomInset } from "../../constants/config";
+import { getBottomInset, CATEGORY_COLORS } from "../../constants/config";
 import { useAuthStore } from "../../store/auth";
 import { postsApi } from "../../services/api";
 import { useAppTheme } from "../../context/ThemeContext";
 
 const PRIMARY = "#E8751A";
-const CAT_COLORS: Record<string, string> = {
-  activity: "#30D158", need: "#0A84FF", selling: "#FFD60A",
-  meetup: "#BF5AF2", event: "#FF453A", study: "#32ADE6",
-  nightlife: "#E8751A", other: "#E8751A",
-};
 
 /** True if post is ended (by status or past event_at + duration). */
 function isPostExpired(item: { status?: string; event_at?: string; eventAt?: string; duration_minutes?: number; durationMinutes?: number }): boolean {
@@ -89,7 +84,7 @@ export default function HistoryScreen() {
             </View>
           }
           renderItem={({ item }) => {
-            const catColor = CAT_COLORS[item.category] || PRIMARY;
+            const catColor = CATEGORY_COLORS[item.category] || PRIMARY;
             const isCreated = item.role === "created" || item.host_id === user?.id;
             const expired = isPostExpired(item);
             return (

@@ -29,12 +29,12 @@ export const COLORS = {
 } as const;
 
 export const CATEGORY_COLORS: Record<string, string> = {
-  activity: '#22c55e',
-  need: '#3b82f6',
-  selling: '#eab308',
-  meetup: '#a855f7',
-  event: '#ef4444',
-  study: '#06b6d4',
+  activity: '#30D158',
+  need: '#0A84FF',
+  selling: '#FFD60A',
+  meetup: '#BF5AF2',
+  event: '#FF453A',
+  study: '#32ADE6',
   nightlife: '#E8751A',
   other: '#E8751A',
 };

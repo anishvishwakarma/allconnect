@@ -10,18 +10,13 @@ import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { postsApi } from "../../services/api";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { getBottomInset, FREE_POST_LIMIT } from "../../constants/config";
+import { getBottomInset, FREE_POST_LIMIT, CATEGORY_COLORS } from "../../constants/config";
 import { useAuthStore } from "../../store/auth";
 import { POST_CATEGORIES } from "../../types";
 import { useAppTheme } from "../../context/ThemeContext";
 import { useAlert } from "../../context/AlertContext";
 
 const PRIMARY = "#E8751A";
-const CAT_COLORS: Record<string, string> = {
-  activity: "#30D158", need: "#0A84FF", selling: "#FFD60A",
-  meetup: "#BF5AF2", event: "#FF453A", study: "#32ADE6",
-  nightlife: "#E8751A", other: "#E8751A",
-};
 
 const EVENT_LIKE_CATEGORIES = new Set(["activity", "event", "meetup", "nightlife", "study"]);
 function getDurationLabel(cat: string): string {
@@ -248,7 +243,7 @@ export default function CreatePostScreen() {
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -4 }}>
             <View style={{ flexDirection: "row", gap: 8, paddingHorizontal: 4, paddingBottom: 4 }}>
               {POST_CATEGORIES.map((cat) => {
-                const c = CAT_COLORS[cat] || PRIMARY;
+                const c = CATEGORY_COLORS[cat] || PRIMARY;
                 const active = category === cat;
                 return (
                   <TouchableOpacity

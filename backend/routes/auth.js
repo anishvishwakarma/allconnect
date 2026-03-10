@@ -11,7 +11,10 @@ const { verifyIdToken, isConfigured } = require('../services/firebase');
 const router = express.Router();
 const OTP_TTL_MINUTES = 10;
 const INDIA_MOBILE_LENGTH = 10;
-const OTP_SECRET = process.env.OTP_SECRET || process.env.JWT_SECRET || '';
+const OTP_SECRET = process.env.OTP_SECRET || process.env.JWT_SECRET;
+if (!OTP_SECRET) {
+  throw new Error('OTP_SECRET (or JWT_SECRET) must be set before starting the server');
+}
 
 function normalizeMobile(mobile) {
   const digits = (mobile || '').replace(/\D/g, '');
@@ -144,7 +147,7 @@ router.get('/email-for-login', rateLimitAuth, async (req, res) => {
 
 // POST /api/auth/firebase — verify Firebase ID token, return our JWT (email+password auth)
 // For registration: send mobile in body to store with email (both required at signup)
-router.post('/firebase', async (req, res) => {
+router.post('/firebase', rateLimitAuth, async (req, res) => {
   try {
     const idToken = (req.body?.idToken || req.body?.id_token || '').trim();
     const mobile = normalizeMobile(req.body?.mobile);
