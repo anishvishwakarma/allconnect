@@ -218,6 +218,20 @@ export default function SettingsScreen() {
             <Text style={[s.rowLabel, { color: text }]}>Contact us</Text>
             <Ionicons name="chevron-forward" size={18} color={sub} />
           </TouchableOpacity>
+          <View style={[s.separator, { backgroundColor: border }]} />
+          <TouchableOpacity
+            onPress={() =>
+              openUrl(
+                "mailto:contact@allpixel.in?subject=AllConnect%20-%20Report%20abuse%20or%20safety%20issue",
+                "Report abuse or safety issue"
+              )
+            }
+            style={s.row}
+          >
+            <Ionicons name="alert-circle-outline" size={20} color={sub} />
+            <Text style={[s.rowLabel, { color: text }]}>Report abuse or safety issue</Text>
+            <Ionicons name="chevron-forward" size={18} color={sub} />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -230,6 +244,20 @@ export default function SettingsScreen() {
           >
             <Ionicons name="shield-checkmark-outline" size={20} color={sub} />
             <Text style={[s.rowLabel, { color: text }]}>Privacy policy</Text>
+            <Ionicons name="chevron-forward" size={18} color={sub} />
+          </TouchableOpacity>
+          <View style={[s.separator, { backgroundColor: border }]} />
+          <TouchableOpacity
+            onPress={() =>
+              openUrl(
+                "https://www.allpixel.in/allconnect-child-safety.html",
+                "Child safety standards"
+              )
+            }
+            style={s.row}
+          >
+            <Ionicons name="shield-half-outline" size={20} color={sub} />
+            <Text style={[s.rowLabel, { color: text }]}>Child safety standards (website)</Text>
             <Ionicons name="chevron-forward" size={18} color={sub} />
           </TouchableOpacity>
           <View style={[s.separator, { backgroundColor: border }]} />
