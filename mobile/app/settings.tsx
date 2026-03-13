@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Linking,
   ActivityIndicator,
+  TextInput,
 } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -32,7 +33,12 @@ export default function SettingsScreen() {
   const setTheme = useThemeStore((s) => s.setTheme);
   const logout = useAuthStore((s) => s.logout);
   const token = useAuthStore((s) => s.token);
+  const user = useAuthStore((s) => s.user);
   const [deleting, setDeleting] = useState(false);
+  const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [reAuthLoading, setReAuthLoading] = useState(false);
 
   const bg = isDark ? "#0C0C0F" : "#F5F5F7";
   const surface = isDark ? "#1A1A1F" : "#FFFFFF";
@@ -73,19 +79,9 @@ export default function SettingsScreen() {
           text: "Delete",
           style: "destructive",
           onPress: () => {
-            alert.show(
-              "Confirm deletion",
-              "Tap the button below to permanently delete your account.",
-              [
-                { text: "Cancel", style: "cancel" },
-                {
-                  text: "Delete my account",
-                  style: "destructive",
-                  onPress: confirmDeleteAccount,
-                },
-              ],
-              "error"
-            );
+            setDeletePassword("");
+            setPasswordError(null);
+            setShowPasswordPrompt(true);
           },
         },
       ],
@@ -238,6 +234,15 @@ export default function SettingsScreen() {
           </TouchableOpacity>
           <View style={[s.separator, { backgroundColor: border }]} />
           <TouchableOpacity
+            onPress={() => openUrl("https://allpixel.in/delete-account.html", "Account deletion")}
+            style={s.row}
+          >
+            <Ionicons name="person-remove-outline" size={20} color={sub} />
+            <Text style={[s.rowLabel, { color: text }]}>Account deletion (website)</Text>
+            <Ionicons name="chevron-forward" size={18} color={sub} />
+          </TouchableOpacity>
+          <View style={[s.separator, { backgroundColor: border }]} />
+          <TouchableOpacity
             onPress={() => router.push("/terms")}
             style={s.row}
           >
@@ -263,6 +268,85 @@ export default function SettingsScreen() {
           </View>
         </View>
       </View>
+      {showPasswordPrompt && (
+        <View style={s.overlay}>
+          <View style={[s.passwordCard, { backgroundColor: surface, borderColor: border }]}>
+            <Text style={[s.passwordTitle, { color: text }]}>Confirm with password</Text>
+            <Text style={[s.passwordSub, { color: sub }]}>
+              For security, enter your password to permanently delete your account.
+            </Text>
+            <TextInput
+              value={deletePassword}
+              onChangeText={(v) => {
+                setDeletePassword(v);
+                if (passwordError) setPasswordError(null);
+              }}
+              placeholder="Password"
+              placeholderTextColor={sub}
+              secureTextEntry
+              autoCapitalize="none"
+              style={[s.passwordInput, { borderColor: passwordError ? "#FF453A" : border, color: text }]}
+            />
+            {passwordError ? <Text style={s.passwordError}>{passwordError}</Text> : null}
+            <View style={s.passwordButtons}>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowPasswordPrompt(false);
+                  setDeletePassword("");
+                  setPasswordError(null);
+                }}
+                style={[s.passwordBtn, { backgroundColor: isDark ? "#252528" : "#F0F0F3" }]}
+                disabled={reAuthLoading}
+              >
+                <Text style={[s.passwordBtnText, { color: sub }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={async () => {
+                  if (!token) return;
+                  if (!user?.email) {
+                    // Fallback: no email on record (e.g. non-email auth) – use existing flow
+                    setShowPasswordPrompt(false);
+                    setDeletePassword("");
+                    setPasswordError(null);
+                    await confirmDeleteAccount();
+                    return;
+                  }
+                  if (!deletePassword.trim()) {
+                    setPasswordError("Enter your password");
+                    return;
+                  }
+                  setReAuthLoading(true);
+                  try {
+                    const { signInWithEmail } = await import("../services/firebaseAuth");
+                    await signInWithEmail(user.email, deletePassword);
+                    setShowPasswordPrompt(false);
+                    setDeletePassword("");
+                    setPasswordError(null);
+                    await confirmDeleteAccount();
+                  } catch (err: any) {
+                    const message = err?.message || "";
+                    if (message.includes("auth/wrong-password")) {
+                      setPasswordError("Incorrect password");
+                    } else {
+                      setPasswordError("Could not verify password. Try again.");
+                    }
+                  } finally {
+                    setReAuthLoading(false);
+                  }
+                }}
+                style={[s.passwordBtn, { backgroundColor: "#FF453A20" }]}
+                disabled={reAuthLoading}
+              >
+                {reAuthLoading ? (
+                  <ActivityIndicator size="small" color="#FF453A" />
+                ) : (
+                  <Text style={[s.passwordBtnText, { color: "#FF453A" }]}>Delete account</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -303,4 +387,34 @@ const s = StyleSheet.create({
   dangerRow: {},
   dangerText: { color: "#FF453A", fontWeight: "600" },
   separator: { height: StyleSheet.hairlineWidth, marginLeft: 48 },
+  overlay: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.45)",
+    paddingHorizontal: 24,
+  },
+  passwordCard: {
+    width: "100%",
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: 20,
+  },
+  passwordTitle: { fontSize: 18, fontWeight: "700", marginBottom: 4 },
+  passwordSub: { fontSize: 13, marginBottom: 12 },
+  passwordInput: {
+    borderWidth: 1.5,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+  },
+  passwordError: { marginTop: 6, fontSize: 12, color: "#FF453A" },
+  passwordButtons: { flexDirection: "row", justifyContent: "flex-end", gap: 10, marginTop: 16 },
+  passwordBtn: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10 },
+  passwordBtnText: { fontSize: 14, fontWeight: "600" },
 });
