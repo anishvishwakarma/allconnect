@@ -15,31 +15,41 @@ router.get('/search', async (req, res) => {
       return res.status(503).json({ error: 'Places search unavailable' });
     }
 
-    const url = new URL('https://maps.googleapis.com/maps/api/place/textsearch/json');
-    url.searchParams.set('query', q);
-    url.searchParams.set('key', apiKey);
-
-    const resp = await fetch(url.toString());
+    // Use Places API (New): https://places.googleapis.com/v1/places:searchText
+    const resp = await fetch('https://places.googleapis.com/v1/places:searchText', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': apiKey,
+        'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location',
+      },
+      body: JSON.stringify({
+        textQuery: q,
+      }),
+    });
     if (!resp.ok) {
       console.error('places/search http', resp.status, await resp.text().catch(() => ''));
       return res.status(502).json({ error: 'Places search failed' });
     }
     const json = await resp.json();
-    if (!json || !Array.isArray(json.results)) {
+    if (!json || !Array.isArray(json.places)) {
       console.error('places/search bad payload', json);
       return res.status(502).json({ error: 'Places search failed' });
     }
 
-    const suggestions = json.results.slice(0, 8).map((r) => {
-      const loc = r.geometry && r.geometry.location;
-      return {
-        id: r.place_id || r.id || r.reference || String(r.name || ''),
-        title: r.name || '',
-        address: r.formatted_address || '',
-        lat: loc && typeof loc.lat === 'number' ? loc.lat : null,
-        lng: loc && typeof loc.lng === 'number' ? loc.lng : null,
-      };
-    }).filter((s) => s.lat != null && s.lng != null && s.title);
+    const suggestions = json.places
+      .slice(0, 8)
+      .map((p) => {
+        const loc = p.location || {};
+        return {
+          id: p.id || p.name || '',
+          title: (p.displayName && p.displayName.text) || '',
+          address: p.formattedAddress || '',
+          lat: typeof loc.latitude === 'number' ? loc.latitude : null,
+          lng: typeof loc.longitude === 'number' ? loc.longitude : null,
+        };
+      })
+      .filter((s) => s.lat != null && s.lng != null && s.title);
 
     return res.json(suggestions);
   } catch (err) {
