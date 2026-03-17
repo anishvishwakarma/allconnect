@@ -53,7 +53,7 @@ module.exports = {
       firebase,
     },
     slug: "allconnect",
-    version: "1.0.0",
+    version: "1.1.0",
     orientation: "portrait",
     icon: "./assets/icon.png",
     userInterfaceStyle: "automatic",
@@ -66,7 +66,7 @@ module.exports = {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.allconnect.app",
-      buildNumber: "1",
+      buildNumber: "2",
       config: { googleMapsApiKey: mapsApiKeyIos },
       infoPlist: {
         NSPhotoLibraryUsageDescription: "AllConnect needs photo access to set your profile picture.",
@@ -79,7 +79,7 @@ module.exports = {
         backgroundColor: "#E8751A",
       },
       package: "com.allconnect.app",
-      versionCode: 1,
+      versionCode: 2,
       config: {
         googleMaps: { apiKey: mapsApiKeyAndroid },
       },

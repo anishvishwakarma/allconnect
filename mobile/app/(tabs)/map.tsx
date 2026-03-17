@@ -208,6 +208,38 @@ export default function MapScreen() {
         onMapReady={() => { setMapReady(true); setMapLoadError(false); }}
         showsUserLocation={locationGranted}
         showsMyLocationButton={false}
+        onLongPress={(e) => {
+          const coord = e.nativeEvent.coordinate;
+          if (!coord) return;
+          if (userLocation) {
+            const dist = getDistanceKm(
+              userLocation.latitude,
+              userLocation.longitude,
+              coord.latitude,
+              coord.longitude
+            );
+            if (dist > 30) {
+              alert.show(
+                "Too far away",
+                "For now you can only create posts within about 30 km of your area. Zoom closer to your city and long-press again.",
+                undefined,
+                "info"
+              );
+              return;
+            }
+          }
+          if (!token) {
+            router.push("/login");
+            return;
+          }
+          router.push({
+            pathname: "/(tabs)/create",
+            params: {
+              lat: String(coord.latitude),
+              lng: String(coord.longitude),
+            },
+          });
+        }}
       >
         {pins.map((pin) => (
           <AnyMarker

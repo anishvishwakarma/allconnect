@@ -18,7 +18,7 @@ import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAppTheme } from "../context/ThemeContext";
 import { useAlert } from "../context/AlertContext";
-import { API_URL, getContentBottomInset } from "../constants/config";
+import { API_URL } from "../constants/config";
 import { authApi } from "../services/api";
 import { useAuthStore } from "../store/auth";
 import {
@@ -285,7 +285,7 @@ export default function LoginScreen() {
   }
 
   return (
-    <View style={[s.root, { backgroundColor: bg, paddingTop: insets.top, paddingBottom: getContentBottomInset(insets.bottom) }]}>
+    <View style={[s.root, { backgroundColor: bg, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}

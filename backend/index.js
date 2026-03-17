@@ -12,6 +12,7 @@ const usersRoutes = require('./routes/users');
 const postsRoutes = require('./routes/posts');
 const requestsRoutes = require('./routes/requests');
 const chatsRoutes = require('./routes/chats');
+const placesRoutes = require('./routes/places');
 
 const app = express();
 const server = http.createServer(app);
@@ -39,6 +40,7 @@ app.use('/api/users', usersRoutes);
 app.use('/api/posts/:postId', requestsRoutes); // must be before /api/posts so /request, /approve etc. match
 app.use('/api/posts', postsRoutes);
 app.use('/api/chats', chatsRoutes);
+app.use('/api/places', placesRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });

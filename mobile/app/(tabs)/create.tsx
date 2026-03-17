@@ -6,9 +6,9 @@ import {
 } from "react-native";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import * as Location from "expo-location";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { postsApi } from "../../services/api";
+import { postsApi, placesApi } from "../../services/api";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getBottomInset, FREE_POST_LIMIT, CATEGORY_COLORS } from "../../constants/config";
 import { useAuthStore } from "../../store/auth";
@@ -34,6 +34,7 @@ function getDurationHint(cat: string): string {
 
 export default function CreatePostScreen() {
   const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<{ lat?: string; lng?: string }>();
   const token = useAuthStore((s) => s.token);
   const user = useAuthStore((s) => s.user);
   const updateUser = useAuthStore((s) => s.updateUser);
@@ -49,10 +50,17 @@ export default function CreatePostScreen() {
   const [costPerPerson, setCostPerPerson] = useState("0");
   const [maxParticipants, setMaxParticipants] = useState("4");
   const [approvalRequired, setApprovalRequired] = useState(true);
-  const [lat, setLat] = useState<number | null>(null);
-  const [lng, setLng] = useState<number | null>(null);
+  const initialLat = typeof params.lat === "string" ? parseFloat(params.lat) : NaN;
+  const initialLng = typeof params.lng === "string" ? parseFloat(params.lng) : NaN;
+  const [lat, setLat] = useState<number | null>(!isNaN(initialLat) ? initialLat : null);
+  const [lng, setLng] = useState<number | null>(!isNaN(initialLng) ? initialLng : null);
   const [loading, setLoading] = useState(false);
   const [fetchingLoc, setFetchingLoc] = useState(false);
+  const [locationQuery, setLocationQuery] = useState("");
+  const [searchingPlaces, setSearchingPlaces] = useState(false);
+  const [placeResults, setPlaceResults] = useState<
+    { id: string; title: string; address: string; lat: number; lng: number }[]
+  >([]);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
 
@@ -157,6 +165,31 @@ export default function CreatePostScreen() {
       }
     } finally {
       setFetchingLoc(false);
+    }
+  }
+
+  async function searchPlaces() {
+    const q = locationQuery.trim();
+    if (!q) {
+      alert.show("Location", "Type a place name or address to search.", undefined, "info");
+      return;
+    }
+    setSearchingPlaces(true);
+    try {
+      const results = await placesApi.search(q);
+      setPlaceResults(results);
+      if (!results.length) {
+        alert.show("Location", "No matching places found. Try a different query.", undefined, "info");
+      }
+    } catch (err: any) {
+      alert.show(
+        "Location search",
+        "Could not search for places right now. Please try again.",
+        undefined,
+        "error"
+      );
+    } finally {
+      setSearchingPlaces(false);
     }
   }
 
@@ -271,6 +304,74 @@ export default function CreatePostScreen() {
 
         {/* Location */}
         <Section label="Location" icon="location-outline" iconColor={PRIMARY} required>
+          <TextInput
+            value={locationQuery}
+            onChangeText={(v) => {
+              setLocationQuery(v);
+              if (!v.trim()) setPlaceResults([]);
+            }}
+            onSubmitEditing={searchPlaces}
+            placeholder="Search place or address"
+            placeholderTextColor={sub}
+            style={[
+              s.input,
+              {
+                backgroundColor: inputBg,
+                color: text,
+                borderColor: locationQuery ? PRIMARY : border,
+                marginBottom: 10,
+              },
+            ]}
+          />
+          <TouchableOpacity
+            onPress={searchPlaces}
+            disabled={searchingPlaces}
+            style={[s.locSearchBtn, { borderColor: border, backgroundColor: inputBg }]}
+          >
+            {searchingPlaces ? (
+              <ActivityIndicator size="small" color={PRIMARY} />
+            ) : (
+              <>
+                <Ionicons name="search" size={16} color={PRIMARY} />
+                <Text style={[s.locSearchText, { color: PRIMARY }]}>Search this area</Text>
+              </>
+            )}
+          </TouchableOpacity>
+          {placeResults.length > 0 && (
+            <View style={s.placeList}>
+              {placeResults.map((p) => (
+                <TouchableOpacity
+                  key={p.id}
+                  style={[s.placeRow, { borderColor: border, backgroundColor: surface }]}
+                  onPress={() => {
+                    setLat(p.lat);
+                    setLng(p.lng);
+                    setAddressText(p.address || p.title);
+                    setPlaceResults([]);
+                    alert.show(
+                      "Location set",
+                      `Using ${p.title} as the event location.`,
+                      undefined,
+                      "success"
+                    );
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="location-outline" size={16} color={PRIMARY} />
+                  <View style={{ flex: 1, marginLeft: 10 }}>
+                    <Text style={[s.placeTitle, { color: text }]} numberOfLines={1}>
+                      {p.title}
+                    </Text>
+                    {p.address ? (
+                      <Text style={[s.placeAddress, { color: sub }]} numberOfLines={1}>
+                        {p.address}
+                      </Text>
+                    ) : null}
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
           <TouchableOpacity
             onPress={pickLocation}
             style={[s.locBtn, { backgroundColor: lat != null ? PRIMARY + "12" : inputBg, borderColor: lat != null ? PRIMARY : border }]}
@@ -451,6 +552,34 @@ const s = StyleSheet.create({
   locBtn: { flexDirection: "row", alignItems: "center", borderWidth: 1.5, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14 },
   locPrimary: { fontSize: 15, fontWeight: "600" },
   locSub: { fontSize: 12, marginTop: 2 },
+  locSearchBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginBottom: 8,
+    gap: 6,
+  },
+  locSearchText: { fontSize: 12, fontWeight: "600" },
+  placeList: {
+    marginBottom: 8,
+    borderRadius: 12,
+    overflow: "hidden",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "transparent",
+  },
+  placeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  placeTitle: { fontSize: 14, fontWeight: "600" },
+  placeAddress: { fontSize: 12, marginTop: 2 },
   toggleCard: { flexDirection: "row", alignItems: "center", padding: 16, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth },
   toggleIcon: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
   toggleTitle: { fontSize: 15, fontWeight: "600" },

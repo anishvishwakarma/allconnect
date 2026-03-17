@@ -218,3 +218,11 @@ export const chatsApi = {
       body: JSON.stringify({ body }),
     }),
 };
+
+// ── Places (server-side Google Places proxy) ─────────────
+export const placesApi = {
+  search: (q: string) =>
+    request<Array<{ id: string; title: string; address: string; lat: number; lng: number }>>(
+      `/api/places/search?q=${encodeURIComponent(q)}`
+    ),
+};
