@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  ActivityIndicator, Dimensions,
+  ActivityIndicator, Dimensions, TextInput,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import MapView, { Marker, PROVIDER_GOOGLE, MapMarkerProps } from "react-native-maps";
@@ -11,7 +11,7 @@ import * as Location from "expo-location";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuthStore } from "../../store/auth";
-import { postsApi, requestsApi } from "../../services/api";
+import { postsApi, requestsApi, placesApi } from "../../services/api";
 import { useAppTheme } from "../../context/ThemeContext";
 import { useAlert } from "../../context/AlertContext";
 import { getBottomInset, CATEGORY_COLORS } from "../../constants/config";
@@ -59,6 +59,12 @@ export default function MapScreen() {
   const [mapReady, setMapReady] = useState(false);
   const [mapKey, setMapKey] = useState(0);
   const [locating, setLocating] = useState(false);
+  const [draftPin, setDraftPin] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<
+    { id: string; title: string; address: string; lat: number; lng: number }[]
+  >([]);
   const regionRef = useRef(region);
   const mapLoadCheckRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   regionRef.current = region;
@@ -194,6 +200,46 @@ export default function MapScreen() {
     setMapKey((k) => k + 1);
   }
 
+  async function searchPlacesOnMap() {
+    const q = searchQuery.trim();
+    if (!q) {
+      alert.show("Search", "Type a place or area name to search.", undefined, "info");
+      return;
+    }
+    setSearching(true);
+    try {
+      const results = await placesApi.search(q);
+      setSearchResults(results);
+      if (!results.length) {
+        alert.show("Search", "No matching places found. Try a different query.", undefined, "info");
+        return;
+      }
+      const first = results[0];
+      if (first.lat != null && first.lng != null) {
+        const nextRegion = {
+          latitude: first.lat,
+          longitude: first.lng,
+          latitudeDelta: 0.03,
+          longitudeDelta: 0.03,
+        };
+        regionRef.current = { ...regionRef.current, ...nextRegion };
+        setRegion((prev) => ({ ...prev, ...nextRegion }));
+        mapRef.current?.animateToRegion(nextRegion, 400);
+        // Show a draft pin where the search landed; user can then long-press nearby or tap Create post here
+        setDraftPin({ latitude: first.lat, longitude: first.lng });
+      }
+    } catch (err: any) {
+      alert.show(
+        "Search",
+        "Could not search for places right now. Please try again.",
+        undefined,
+        "error"
+      );
+    } finally {
+      setSearching(false);
+    }
+  }
+
   return (
     <View style={{ flex: 1, backgroundColor: bg, minHeight: SCREEN_H }}>
       <MapView
@@ -228,19 +274,18 @@ export default function MapScreen() {
               return;
             }
           }
-          if (!token) {
-            router.push("/login");
-            return;
-          }
-          router.push({
-            pathname: "/(tabs)/create",
-            params: {
-              lat: String(coord.latitude),
-              lng: String(coord.longitude),
-            },
-          });
+          setDraftPin({ latitude: coord.latitude, longitude: coord.longitude });
         }}
       >
+        {draftPin && (
+          <AnyMarker
+            coordinate={draftPin}
+          >
+            <View style={[s.markerOuter, { borderColor: "#111111" }]}>
+              <View style={[s.markerInner, { backgroundColor: "#111111" }]} />
+            </View>
+          </AnyMarker>
+        )}
         {pins.map((pin) => (
           <AnyMarker
             key={pin.id}
@@ -280,37 +325,143 @@ export default function MapScreen() {
         </View>
       )}
 
-      {/* ── Filter chips + Refresh ── */}
+      {/* ── Search bar + Filter chips + Refresh ── */}
       <View style={[s.filtersContainer, { top: insets.top + 8 }]}>
-        <TouchableOpacity
-          onPress={() => fetchPins()}
-          disabled={loading}
-          style={[s.refreshBtn, { backgroundColor: surface, borderColor: border }]}
-        >
-          <Ionicons name="refresh" size={18} color={loading ? sub : PRIMARY} />
-        </TouchableOpacity>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 12, gap: 8, flexDirection: "row", alignItems: "center" }}>
-          {WHEN_FILTERS.map(({ key, label }) => (
-            <TouchableOpacity
-              key={key}
-              onPress={() => { setLoading(true); setFilter((f) => ({ ...f, when: f.when === key ? undefined : key })); }}
-              style={[s.chip, { backgroundColor: filter.when === key ? PRIMARY : surface, borderColor: filter.when === key ? PRIMARY : border }]}
-            >
-              <Text style={[s.chipText, { color: filter.when === key ? "#fff" : text }]}>{label}</Text>
-            </TouchableOpacity>
-          ))}
-          <View style={[s.divider, { backgroundColor: border }]} />
-          {CATEGORIES.map((cat) => (
-            <TouchableOpacity
-              key={cat}
-              onPress={() => { setLoading(true); setFilter((f) => ({ ...f, category: f.category === cat ? undefined : cat })); }}
-              style={[s.chip, { backgroundColor: filter.category === cat ? CATEGORY_COLORS[cat] : surface, borderColor: filter.category === cat ? CATEGORY_COLORS[cat] : border }]}
-            >
-              <View style={[s.catDot, { backgroundColor: CATEGORY_COLORS[cat] || "#636366", opacity: filter.category === cat ? 0 : 1 }]} />
-              <Text style={[s.chipText, { color: filter.category === cat ? "#fff" : text }]} numberOfLines={1}>{cat}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        <View style={[s.searchBar, { backgroundColor: surface, borderColor: border }]}>
+          <Ionicons name="search" size={16} color={sub} style={{ marginRight: 6 }} />
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ flexGrow: 1, alignItems: "center" }}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+              <TextInput
+                value={searchQuery}
+                onChangeText={(v) => {
+                  setSearchQuery(v);
+                  if (!v.trim()) setSearchResults([]);
+                }}
+                onSubmitEditing={searchPlacesOnMap}
+                placeholder="Search places on map"
+                placeholderTextColor={sub}
+                style={[s.searchInput, { color: text }]}
+              />
+            </View>
+          </ScrollView>
+          <TouchableOpacity
+            onPress={searchPlacesOnMap}
+            disabled={searching}
+            style={s.searchAction}
+          >
+            {searching ? (
+              <ActivityIndicator size="small" color={PRIMARY} />
+            ) : (
+              <Ionicons name="arrow-forward-circle" size={20} color={PRIMARY} />
+            )}
+          </TouchableOpacity>
+        </View>
+        {searchResults.length > 0 && (
+          <View style={[s.searchResults, { backgroundColor: surface, borderColor: border }]}>
+            <ScrollView keyboardShouldPersistTaps="handled">
+              {searchResults.map((r) => (
+                <TouchableOpacity
+                  key={r.id}
+                  style={s.searchResultRow}
+                  activeOpacity={0.85}
+                  onPress={() => {
+                    setSearchQuery(r.title);
+                    setSearchResults([]);
+                    const nextRegion = {
+                      latitude: r.lat,
+                      longitude: r.lng,
+                      latitudeDelta: 0.03,
+                      longitudeDelta: 0.03,
+                    };
+                    regionRef.current = { ...regionRef.current, ...nextRegion };
+                    setRegion((prev) => ({ ...prev, ...nextRegion }));
+                    mapRef.current?.animateToRegion(nextRegion, 400);
+                    setDraftPin({ latitude: r.lat, longitude: r.lng });
+                  }}
+                >
+                  <Ionicons name="location-outline" size={16} color={PRIMARY} />
+                  <View style={{ flex: 1, marginLeft: 8 }}>
+                    <Text style={[s.searchResultTitle, { color: text }]} numberOfLines={1}>
+                      {r.title}
+                    </Text>
+                    {!!r.address && (
+                      <Text style={[s.searchResultAddress, { color: sub }]} numberOfLines={1}>
+                        {r.address}
+                      </Text>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+        <View style={s.filtersRow}>
+          <TouchableOpacity
+            onPress={() => fetchPins()}
+            disabled={loading}
+            style={[s.refreshBtn, { backgroundColor: surface, borderColor: border }]}
+          >
+            <Ionicons name="refresh" size={18} color={loading ? sub : PRIMARY} />
+          </TouchableOpacity>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 12, gap: 8, flexDirection: "row", alignItems: "center" }}
+          >
+            {WHEN_FILTERS.map(({ key, label }) => (
+              <TouchableOpacity
+                key={key}
+                onPress={() => {
+                  setLoading(true);
+                  setFilter((f) => ({ ...f, when: f.when === key ? undefined : key }));
+                }}
+                style={[
+                  s.chip,
+                  {
+                    backgroundColor: filter.when === key ? PRIMARY : surface,
+                    borderColor: filter.when === key ? PRIMARY : border,
+                  },
+                ]}
+              >
+                <Text style={[s.chipText, { color: filter.when === key ? "#fff" : text }]}>{label}</Text>
+              </TouchableOpacity>
+            ))}
+            <View style={[s.divider, { backgroundColor: border }]} />
+            {CATEGORIES.map((cat) => (
+              <TouchableOpacity
+                key={cat}
+                onPress={() => {
+                  setLoading(true);
+                  setFilter((f) => ({ ...f, category: f.category === cat ? undefined : cat }));
+                }}
+                style={[
+                  s.chip,
+                  {
+                    backgroundColor: filter.category === cat ? CATEGORY_COLORS[cat] : surface,
+                    borderColor: filter.category === cat ? CATEGORY_COLORS[cat] : border,
+                  },
+                ]}
+              >
+                <View
+                  style={[
+                    s.catDot,
+                    {
+                      backgroundColor: CATEGORY_COLORS[cat] || "#636366",
+                      opacity: filter.category === cat ? 0 : 1,
+                    },
+                  ]}
+                />
+                <Text style={[s.chipText, { color: filter.category === cat ? "#fff" : text }]} numberOfLines={1}>
+                  {cat}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
       </View>
 
       {/* ── Location FAB (always visible so user can re-center; tap to go to current location) ── */}
@@ -395,6 +546,43 @@ export default function MapScreen() {
           )}
         </View>
       )}
+      {draftPin && !selectedPin && (
+        <View style={[s.draftCard, { backgroundColor: surface, borderColor: border, bottom: TAB_BAR_BASE_HEIGHT + getBottomInset(insets.bottom) + 80 }]}>
+          <Text style={[s.draftTitle, { color: text }]}>Create post here?</Text>
+          <Text style={[s.draftSub, { color: sub }]}>
+            Long-pressed location on the map. You can fine-tune details on the next screen.
+          </Text>
+          <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 10, marginTop: 10 }}>
+            <TouchableOpacity
+              onPress={() => setDraftPin(null)}
+              style={[s.draftBtn, { backgroundColor: isDark ? "#252528" : "#F0F0F3" }]}
+            >
+              <Text style={[s.draftBtnText, { color: sub }]}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => {
+                if (!token) {
+                  setDraftPin(null);
+                  router.push("/login");
+                  return;
+                }
+                const coord = draftPin;
+                setDraftPin(null);
+                router.push({
+                  pathname: "/(tabs)/create",
+                  params: {
+                    lat: String(coord.latitude),
+                    lng: String(coord.longitude),
+                  },
+                });
+              }}
+              style={[s.draftBtn, { backgroundColor: PRIMARY }]}
+            >
+              <Text style={[s.draftBtnText, { color: "#fff" }]}>Create post</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -411,7 +599,37 @@ function PinMeta({ icon, value, sub }: { icon: any; value: string; sub: string }
 const s = StyleSheet.create({
   markerOuter: { width: 22, height: 22, borderRadius: 11, borderWidth: 2.5, alignItems: "center", justifyContent: "center", backgroundColor: "#fff" },
   markerInner: { width: 10, height: 10, borderRadius: 5 },
-  filtersContainer: { position: "absolute", left: 0, right: 0, flexDirection: "row", alignItems: "center", paddingVertical: 8 },
+  filtersContainer: { position: "absolute", left: 0, right: 0, paddingVertical: 8 },
+  searchBar: {
+    marginHorizontal: 16,
+    marginBottom: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  searchInput: { flex: 1, fontSize: 14 },
+  searchAction: { marginLeft: 6 },
+  searchResults: {
+    marginHorizontal: 16,
+    marginBottom: 6,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    maxHeight: 180,
+    overflow: "hidden",
+  },
+  searchResultRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    gap: 4,
+  },
+  searchResultTitle: { fontSize: 13, fontWeight: "600" },
+  searchResultAddress: { fontSize: 11, marginTop: 2 },
+  filtersRow: { flexDirection: "row", alignItems: "center" },
   refreshBtn: {
     width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center",
     marginLeft: 16, borderWidth: 1,
@@ -481,4 +699,21 @@ const s = StyleSheet.create({
   mapErrorSub: { fontSize: 13, textAlign: "center", lineHeight: 18 },
   mapErrorBtn: { paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12, marginTop: 4 },
   mapErrorBtnText: { color: "#fff", fontWeight: "700", fontSize: 15 },
+  draftCard: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  draftTitle: { fontSize: 15, fontWeight: "700" },
+  draftSub: { fontSize: 12, marginTop: 4 },
+  draftBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999 },
+  draftBtnText: { fontSize: 13, fontWeight: "600" },
 });
