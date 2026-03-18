@@ -20,9 +20,14 @@ const server = http.createServer(app);
 // Required for correct client IP when behind Render/proxy (rate limiting, etc.)
 app.set('trust proxy', 1);
 
-const corsOrigin = process.env.CORS_ORIGIN && process.env.CORS_ORIGIN.trim() ? process.env.CORS_ORIGIN.trim() : true;
-if (corsOrigin === true && process.env.NODE_ENV === 'production') {
-  console.warn('CORS_ORIGIN not set — all origins are allowed. Set CORS_ORIGIN in production for security.');
+const corsOrigin =
+  process.env.CORS_ORIGIN && process.env.CORS_ORIGIN.trim()
+    ? process.env.CORS_ORIGIN.trim()
+    : process.env.NODE_ENV === 'production'
+      ? false // safer default for production (native apps don't need browser CORS)
+      : true;
+if (corsOrigin === false) {
+  console.warn('CORS_ORIGIN not set — disabling CORS in production. If you have a web client, set CORS_ORIGIN.');
 }
 const io = new Server(server, {
   path: '/socket.io',

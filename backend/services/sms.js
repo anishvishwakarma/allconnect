@@ -23,7 +23,16 @@ async function sendOtpSms(mobile, code) {
     }
   }
 
-  console.log('[SMS] (no Twilio env) OTP for', mobile, '→', code);
+  // Avoid logging OTP codes in production logs.
+  // Set DEBUG_SMS=true only for local/dev troubleshooting if you fully trust the log sink.
+  const debugSms = process.env.DEBUG_SMS === 'true';
+  const digits = String(mobile ?? '').replace(/\D/g, '');
+  const mobileTail = digits.slice(-4);
+  if (debugSms) {
+    console.log('[SMS] (no Twilio env) OTP for', mobileTail, '→', code);
+  } else {
+    console.log('[SMS] (no Twilio env) OTP generated for', mobileTail);
+  }
 }
 
 module.exports = { sendOtpSms };
