@@ -424,7 +424,7 @@ export default function CreatePostScreen() {
               <DateTimePicker
                 value={eventAt ?? new Date()}
                 mode="date"
-                display={Platform.OS === "ios" ? "inline" : "default"}
+                display={Platform.OS === "ios" ? "inline" : "spinner"}
                 minimumDate={new Date()}
                 onChange={handleDateChange}
               />
@@ -435,7 +435,7 @@ export default function CreatePostScreen() {
               <DateTimePicker
                 value={eventAt ?? new Date()}
                 mode="time"
-                display={Platform.OS === "ios" ? "spinner" : "default"}
+                display="spinner"
                 onChange={handleTimeChange}
               />
             </View>
