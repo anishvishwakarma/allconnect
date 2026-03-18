@@ -2,15 +2,24 @@ const express = require('express');
 
 const router = express.Router();
 
+const { rateLimitAuth } = require('../middleware/rateLimitAuth');
+
+const MAX_QUERY_LEN = 120;
+
 // GET /api/places/search?q=
-router.get('/search', async (req, res) => {
+router.get('/search', rateLimitAuth, async (req, res) => {
   try {
     const q = (req.query.q || '').toString().trim();
     if (!q) {
       return res.status(400).json({ error: 'q is required' });
     }
+    if (q.length > MAX_QUERY_LEN) {
+      return res.status(400).json({ error: `q is too long (max ${MAX_QUERY_LEN} chars)` });
+    }
     const lat = req.query.lat != null ? parseFloat(req.query.lat) : null;
     const lng = req.query.lng != null ? parseFloat(req.query.lng) : null;
+    const safeLat = lat != null && Number.isFinite(lat) ? lat : null;
+    const safeLng = lng != null && Number.isFinite(lng) ? lng : null;
     const radiusKm = req.query.radius_km != null ? parseFloat(req.query.radius_km) : 30;
     const apiKey = process.env.GOOGLE_PLACES_API_KEY;
     if (!apiKey) {
@@ -29,11 +38,11 @@ router.get('/search', async (req, res) => {
       body: JSON.stringify({
         textQuery: q,
         // Bias results to the current map area (so "Ramna" doesn't show worldwide matches).
-        ...(lat != null && lng != null
+        ...(safeLat != null && safeLng != null
           ? {
               locationBias: {
                 circle: {
-                  center: { latitude: lat, longitude: lng },
+                  center: { latitude: safeLat, longitude: safeLng },
                   radius: (Number.isFinite(radiusKm) ? radiusKm : 30) * 1000,
                 },
               },
