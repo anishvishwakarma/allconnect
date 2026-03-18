@@ -216,7 +216,7 @@ export default function ChatScreen() {
 
       {/* Input bar */}
       {!expired ? (
-        <View style={[s.inputBar, { backgroundColor: surface, borderTopColor: border, paddingBottom: getBottomInset(insets.bottom) + 10 }]}>
+        <View style={[s.inputBar, { backgroundColor: surface, borderTopColor: border, paddingBottom: insets.bottom || 6 }]}>
           <TextInput
             value={input} onChangeText={handleChange}
             placeholder="Message..." placeholderTextColor={sub}
@@ -232,7 +232,7 @@ export default function ChatScreen() {
           </TouchableOpacity>
         </View>
       ) : (
-        <View style={[s.expiredBar, { backgroundColor: "#FF453A10", borderTopColor: "#FF453A30", paddingBottom: getBottomInset(insets.bottom) + 14 }]}>
+        <View style={[s.expiredBar, { backgroundColor: "#FF453A10", borderTopColor: "#FF453A30", paddingBottom: insets.bottom || 8 }]}>
           <Ionicons name="lock-closed-outline" size={14} color="#FF453A" />
           <Text style={s.expiredBarText}>This group chat has ended</Text>
         </View>
