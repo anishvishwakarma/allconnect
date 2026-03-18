@@ -164,8 +164,10 @@ export default function ChatScreen() {
     );
   }
 
+  const safeBottom = Math.max(insets.bottom || 0, 0);
+
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1, backgroundColor: bg }}>
+    <KeyboardAvoidingView behavior="padding" style={{ flex: 1, backgroundColor: bg }}>
       {/* Header */}
       <View style={[s.header, { backgroundColor: surface, borderBottomColor: border, paddingTop: insets.top + 12 }]}>
         <TouchableOpacity onPress={() => router.back()} style={[s.backBtn, { backgroundColor: isDark ? "#252528" : "#F0F0F3" }]}>
@@ -190,7 +192,7 @@ export default function ChatScreen() {
           data={messages}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8, gap: 4 }}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: safeBottom + 8, gap: 4 }}
           onContentSizeChange={() => flatRef.current?.scrollToEnd({ animated: false })}
           ListEmptyComponent={
             <View style={s.center}>
@@ -216,7 +218,7 @@ export default function ChatScreen() {
 
       {/* Input bar */}
       {!expired ? (
-        <View style={[s.inputBar, { backgroundColor: surface, borderTopColor: border, paddingBottom: insets.bottom || 6 }]}>
+        <View style={[s.inputBar, { backgroundColor: surface, borderTopColor: border, paddingBottom: safeBottom }]}>
           <TextInput
             value={input} onChangeText={handleChange}
             placeholder="Message..." placeholderTextColor={sub}
@@ -232,7 +234,7 @@ export default function ChatScreen() {
           </TouchableOpacity>
         </View>
       ) : (
-        <View style={[s.expiredBar, { backgroundColor: "#FF453A10", borderTopColor: "#FF453A30", paddingBottom: insets.bottom || 8 }]}>
+        <View style={[s.expiredBar, { backgroundColor: "#FF453A10", borderTopColor: "#FF453A30", paddingBottom: safeBottom }]}>
           <Ionicons name="lock-closed-outline" size={14} color="#FF453A" />
           <Text style={s.expiredBarText}>This group chat has ended</Text>
         </View>

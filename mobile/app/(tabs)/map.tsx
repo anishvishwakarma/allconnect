@@ -60,6 +60,7 @@ export default function MapScreen() {
   const [mapKey, setMapKey] = useState(0);
   const [locating, setLocating] = useState(false);
   const [draftPin, setDraftPin] = useState<{ latitude: number; longitude: number } | null>(null);
+  const lastPinTapAtRef = useRef<number>(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<
@@ -260,6 +261,8 @@ export default function MapScreen() {
         showsUserLocation={locationGranted}
         showsMyLocationButton={false}
         onLongPress={(e) => {
+          // Prevent MapView long-press from interfering with quick taps on existing pins.
+          if (Date.now() - lastPinTapAtRef.current < 650) return;
           const coord = e.nativeEvent.coordinate;
           if (!coord) return;
           if (userLocation) {
@@ -296,6 +299,8 @@ export default function MapScreen() {
             key={pin.id}
             coordinate={{ latitude: pin.lat, longitude: pin.lng }}
             onPress={() => {
+              lastPinTapAtRef.current = Date.now();
+              setDraftPin(null);
               setSelectedPin(pin);
               setReqDone(false);
               // Momo-style: center map on selected pin for clear pin–card connection
