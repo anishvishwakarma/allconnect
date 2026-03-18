@@ -176,7 +176,7 @@ export default function CreatePostScreen() {
     }
     setSearchingPlaces(true);
     try {
-      const results = await placesApi.search(q);
+      const results = await placesApi.search(q, lat != null && lng != null ? { lat, lng, radiusKm: 30 } : {});
       setPlaceResults(results);
       if (!results.length) {
         alert.show("Location", "No matching places found. Try a different query.", undefined, "info");

@@ -220,19 +220,32 @@ export default function MapScreen() {
         alert.show("Search", "No matching places found. Try a different query.", undefined, "info");
         return;
       }
-      const first = results[0];
-      if (first.lat != null && first.lng != null) {
+      // If user location is known, auto-pick the first result within our allowed radius.
+      const candidate = userLocation
+        ? results.find(
+            (r) => r.lat != null && r.lng != null && getDistanceKm(userLocation.latitude, userLocation.longitude, r.lat, r.lng) <= 30
+          ) ?? null
+        : results[0] ?? null;
+
+      if (candidate?.lat != null && candidate.lng != null) {
         const nextRegion = {
-          latitude: first.lat,
-          longitude: first.lng,
+          latitude: candidate.lat,
+          longitude: candidate.lng,
           latitudeDelta: 0.03,
           longitudeDelta: 0.03,
         };
         regionRef.current = { ...regionRef.current, ...nextRegion };
         setRegion((prev) => ({ ...prev, ...nextRegion }));
         mapRef.current?.animateToRegion(nextRegion, 400);
-        // Show a draft pin where the search landed; user can then long-press nearby or tap Create post here
-        setDraftPin({ latitude: first.lat, longitude: first.lng });
+        // Show a draft pin where the search landed; user can then fine-tune details on Create.
+        setDraftPin({ latitude: candidate.lat, longitude: candidate.lng });
+      } else if (userLocation) {
+        alert.show(
+          "Too far away",
+          "For now you can only create posts within about 30 km of your current area. Zoom closer and try again.",
+          undefined,
+          "info"
+        );
       }
     } catch (err: any) {
       alert.show(
@@ -379,6 +392,18 @@ export default function MapScreen() {
                   style={s.searchResultRow}
                   activeOpacity={0.85}
                   onPress={() => {
+                    if (userLocation) {
+                      const dist = getDistanceKm(userLocation.latitude, userLocation.longitude, r.lat, r.lng);
+                      if (dist > 30) {
+                        alert.show(
+                          "Too far away",
+                          "For now you can only create posts within about 30 km of your current area.",
+                          undefined,
+                          "info"
+                        );
+                        return;
+                      }
+                    }
                     setSearchQuery(r.title);
                     setSearchResults([]);
                     const nextRegion = {
@@ -577,6 +602,18 @@ export default function MapScreen() {
                   return;
                 }
                 const coord = draftPin;
+              if (userLocation) {
+                const dist = getDistanceKm(userLocation.latitude, userLocation.longitude, coord.latitude, coord.longitude);
+                if (dist > 30) {
+                  alert.show(
+                    "Too far away",
+                    "For now you can only create posts within about 30 km of your current area. Zoom closer and try again.",
+                    undefined,
+                    "info"
+                  );
+                  return;
+                }
+              }
                 setDraftPin(null);
                 router.push({
                   pathname: "/(tabs)/create",
