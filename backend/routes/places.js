@@ -9,6 +9,9 @@ router.get('/search', async (req, res) => {
     if (!q) {
       return res.status(400).json({ error: 'q is required' });
     }
+    const lat = req.query.lat != null ? parseFloat(req.query.lat) : null;
+    const lng = req.query.lng != null ? parseFloat(req.query.lng) : null;
+    const radiusKm = req.query.radius_km != null ? parseFloat(req.query.radius_km) : 30;
     const apiKey = process.env.GOOGLE_PLACES_API_KEY;
     if (!apiKey) {
       console.error('GOOGLE_PLACES_API_KEY not set');
@@ -25,6 +28,17 @@ router.get('/search', async (req, res) => {
       },
       body: JSON.stringify({
         textQuery: q,
+        // Bias results to the current map area (so "Ramna" doesn't show worldwide matches).
+        ...(lat != null && lng != null
+          ? {
+              locationBias: {
+                circle: {
+                  center: { latitude: lat, longitude: lng },
+                  radius: (Number.isFinite(radiusKm) ? radiusKm : 30) * 1000,
+                },
+              },
+            }
+          : {}),
       }),
     });
     if (!resp.ok) {

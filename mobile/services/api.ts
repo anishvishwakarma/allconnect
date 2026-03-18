@@ -221,8 +221,17 @@ export const chatsApi = {
 
 // ── Places (server-side Google Places proxy) ─────────────
 export const placesApi = {
-  search: (q: string) =>
+  search: (
+    q: string,
+    opts: { lat?: number; lng?: number; radiusKm?: number } = {}
+  ) =>
     request<Array<{ id: string; title: string; address: string; lat: number; lng: number }>>(
-      `/api/places/search?q=${encodeURIComponent(q)}`
+      `/api/places/search?q=${encodeURIComponent(q)}${
+        opts.lat != null && opts.lng != null
+          ? `&lat=${encodeURIComponent(String(opts.lat))}&lng=${encodeURIComponent(
+              String(opts.lng)
+            )}&radius_km=${encodeURIComponent(String(opts.radiusKm ?? 30))}`
+          : ""
+      }`
     ),
 };

@@ -208,7 +208,12 @@ export default function MapScreen() {
     }
     setSearching(true);
     try {
-      const results = await placesApi.search(q);
+      const center = regionRef.current;
+      const results = await placesApi.search(q, {
+        lat: center.latitude,
+        lng: center.longitude,
+        radiusKm: 30,
+      });
       setSearchResults(results);
       if (!results.length) {
         alert.show("Search", "No matching places found. Try a different query.", undefined, "info");
