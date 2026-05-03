@@ -76,7 +76,7 @@ const styles = StyleSheet.create({
   googleBtn: {
     borderWidth: 1.5,
     borderRadius: 14,
-    paddingVertical: 14,
+    paddingVertical: 13,
     alignItems: "center",
     justifyContent: "center",
   },

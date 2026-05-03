@@ -14,6 +14,7 @@ import {
   TouchableWithoutFeedback,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { StatusBar } from "expo-status-bar";
 import { router } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import type { User as FirebaseUser } from "firebase/auth";
@@ -48,6 +49,13 @@ function normalizeMobile(input: string): string {
   const digits = (input || "").replace(/\D/g, "");
   if (digits.length >= 10) return "+91" + digits.slice(-10);
   return "";
+}
+
+/** Login sits edge-to-edge at bottom; avoid double padding + huge Android nav gaps. */
+function loginScrollBottomInset(bottom: number): number {
+  if (Platform.OS === "ios") return Math.max(bottom, 12);
+  const b = Math.max(bottom, 8);
+  return Math.min(b, 24);
 }
 
 export default function LoginScreen() {
@@ -384,16 +392,22 @@ export default function LoginScreen() {
     }
   }
 
+  const scrollBottom = loginScrollBottomInset(insets.bottom);
+
   return (
-    <View style={[s.root, { backgroundColor: bg, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+    <View style={[s.root, { backgroundColor: bg, paddingTop: insets.top }]}>
+      <StatusBar style={isDark ? "light" : "dark"} />
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={{ flex: 1 }}
-          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={s.flex1}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
         >
           <ScrollView
-            contentContainerStyle={[s.scrollContent, { paddingTop: 16, paddingBottom: 16 }]}
+            contentContainerStyle={[
+              s.scrollContent,
+              { paddingBottom: scrollBottom + 4 },
+            ]}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
             bounces={false}
@@ -670,44 +684,47 @@ export default function LoginScreen() {
 
 const s = StyleSheet.create({
   root: { flex: 1 },
+  flex1: { flex: 1 },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: "center",
-    paddingHorizontal: 24,
+    justifyContent: "flex-start",
+    paddingHorizontal: 22,
+    paddingTop: 10,
   },
-  brandArea: { alignItems: "center", marginBottom: 32 },
+  brandArea: { alignItems: "center", marginBottom: 22, paddingTop: 8 },
   logoContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 24,
+    width: 76,
+    height: 76,
+    borderRadius: 22,
     backgroundColor: "#FFF3E8",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 16,
+    marginBottom: 14,
     shadowColor: "#E8751A",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  logo: { width: 56, height: 56, borderRadius: 14 },
-  appName: { fontSize: 32, fontWeight: "800", letterSpacing: -0.5 },
-  tagline: { fontSize: 15, marginTop: 6, textAlign: "center", lineHeight: 22 },
-  card: {
-    borderRadius: 20,
-    borderWidth: 1,
-    padding: 24,
-    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 16,
-    elevation: 4,
+    shadowOpacity: 0.14,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  logo: { width: 52, height: 52, borderRadius: 14 },
+  appName: { fontSize: 28, fontWeight: "800", letterSpacing: -0.5 },
+  tagline: { fontSize: 14, marginTop: 4, textAlign: "center", lineHeight: 20, paddingHorizontal: 8 },
+  card: {
+    borderRadius: 18,
+    borderWidth: 1,
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.07,
+    shadowRadius: 14,
+    elevation: 3,
   },
   sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 10,
-    marginTop: 16,
+    marginBottom: 8,
+    marginTop: 12,
   },
   sectionIcon: {
     width: 36,
@@ -736,16 +753,16 @@ const s = StyleSheet.create({
   primaryButton: {
     backgroundColor: PRIMARY,
     borderRadius: 14,
-    paddingVertical: 16,
+    paddingVertical: 15,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 24,
+    marginTop: 20,
     shadowColor: PRIMARY,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.28,
+    shadowRadius: 8,
+    elevation: 3,
   },
   primaryButtonText: { color: "#fff", fontSize: 17, fontWeight: "700" },
   loadingHint: { fontSize: 12, marginTop: 10, textAlign: "center" },
@@ -753,24 +770,24 @@ const s = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "center",
-    marginTop: 20,
+    marginTop: 16,
     alignItems: "center",
   },
   switchText: { fontSize: 14 },
   footer: {
     alignItems: "center",
-    marginTop: 36,
-    paddingBottom: 8,
+    marginTop: 22,
+    paddingBottom: 0,
   },
-  footerDivider: { width: 40, marginBottom: 12 },
+  footerDivider: { width: 36, marginBottom: 8 },
   dividerLine: { height: 1 },
   footerText: { fontSize: 12, fontWeight: "500", letterSpacing: 0.5 },
   googleGateTitle: { fontSize: 20, fontWeight: "700", marginBottom: 8 },
   oauthOrRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 20,
-    marginBottom: 4,
+    marginTop: 16,
+    marginBottom: 2,
   },
   oauthOrLine: { flex: 1, height: StyleSheet.hairlineWidth },
   oauthOrText: { fontSize: 13, fontWeight: "600", marginHorizontal: 12 },
