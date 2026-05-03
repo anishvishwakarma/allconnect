@@ -283,6 +283,7 @@ export default function LoginScreen() {
           throw e;
         }
       } catch (err: any) {
+        await signOutFirebase().catch(() => {});
         const msg = err?.message || "Google sign-in failed.";
         if (msg.includes("account-exists-with-different-credential"))
           alert.show(

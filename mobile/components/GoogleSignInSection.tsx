@@ -44,7 +44,9 @@ export function GoogleSignInButton({
   });
 
   useEffect(() => {
-    if (response?.type !== "success") return;
+    if (!response) return;
+    if (response.type === "error") return;
+    if (response.type !== "success") return;
     const idToken =
       typeof response.params?.id_token === "string" ? response.params.id_token : "";
     if (!idToken) return;
@@ -57,7 +59,9 @@ export function GoogleSignInButton({
     <TouchableOpacity
       style={[styles.googleBtn, { borderColor, backgroundColor }]}
       disabled={!request || disabled}
-      onPress={() => promptAsync()}
+      onPress={() => {
+        void promptAsync().catch(() => {});
+      }}
       activeOpacity={0.85}
     >
       <View style={styles.row}>

@@ -208,7 +208,7 @@ function EventMapMarker({
     const delay = pulse ? 3400 : 1000;
     const t = setTimeout(() => setTracksViewChanges(false), delay);
     return () => clearTimeout(t);
-  }, [pulse, pin.id]);
+  }, [pulse, pin.id, selected]);
   const color = CATEGORY_COLORS[pin.category ?? ""] || PRIMARY;
   const icon = CATEGORY_MARKER_ICONS[pin.category ?? ""] ?? "location";
   return (
