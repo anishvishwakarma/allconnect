@@ -41,24 +41,24 @@ function createRateLimiter({ windowMs, max, keyFn }) {
   };
 }
 
-/** All /api traffic per IP (broad abuse cap). */
+/** All /api traffic per IP (broad abuse cap; stricter caps on specific routes below). */
 const rateLimitApiGlobal = createRateLimiter({
   windowMs: 15 * 60 * 1000,
-  max: 500,
+  max: 400,
   keyFn: (req) => `api-global:${clientIp(req)}`,
 });
 
 /** Public map feed — expensive DB + geo queries. */
 const rateLimitPostsNearby = createRateLimiter({
   windowMs: 15 * 60 * 1000,
-  max: 120,
+  max: 100,
   keyFn: (req) => `posts-nearby:${clientIp(req)}`,
 });
 
 /** Public post detail scraping. */
 const rateLimitPostsGetById = createRateLimiter({
   windowMs: 15 * 60 * 1000,
-  max: 200,
+  max: 150,
   keyFn: (req) => `posts-get:${clientIp(req)}`,
 });
 

@@ -17,18 +17,17 @@ const placesRoutes = require('./routes/places');
 const app = express();
 const server = http.createServer(app);
 const { rateLimitApiGlobal, rateLimitHealth } = require('./middleware/rateLimiter');
+const {
+  securityHeaders,
+  enforceProductionHttps,
+  apiNoCacheAndRequestId,
+} = require('./middleware/apiSecurity');
 
 // Required for correct client IP when behind Render/proxy (rate limiting, etc.)
 app.set('trust proxy', 1);
 
-// Baseline security headers (API + JSON; not a substitute for WAF / TLS at the edge)
-app.use((req, res, next) => {
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'DENY');
-  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
-  next();
-});
+app.use(securityHeaders);
+app.use(enforceProductionHttps);
 
 const corsOrigin =
   process.env.CORS_ORIGIN && process.env.CORS_ORIGIN.trim()
@@ -46,6 +45,7 @@ const io = new Server(server, {
 
 app.use(cors({ origin: corsOrigin }));
 app.use(express.json({ limit: '10mb' }));
+app.use(apiNoCacheAndRequestId);
 
 app.get('/health', rateLimitHealth, (req, res) => res.json({ ok: true }));
 app.get('/', (req, res) => res.json({ name: 'AllConnect API', health: '/health' }));
