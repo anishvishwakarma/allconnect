@@ -26,6 +26,22 @@ const google = {
   androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || "",
 };
 
+/** iOS reversed client id for Google Sign-In URL scheme (from EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID). */
+function iosGoogleUrlSchemeFromClientId(iosClientId) {
+  const id = String(iosClientId || "").trim();
+  if (!id) return "";
+  const suf = ".apps.googleusercontent.com";
+  const i = id.indexOf(suf);
+  if (i === -1) return "";
+  return "com.googleusercontent.apps." + id.slice(0, i);
+}
+
+const googleIosUrlScheme = iosGoogleUrlSchemeFromClientId(google.iosClientId);
+const googleSignInPlugin =
+  googleIosUrlScheme.startsWith("com.googleusercontent.apps.")
+    ? [["@react-native-google-signin/google-signin", { iosUrlScheme: googleIosUrlScheme }]]
+    : [];
+
 const requiredEnv = [
   ["EXPO_PUBLIC_GOOGLE_MAPS_API_KEY", mapsApiKey],
   ["EXPO_PUBLIC_FIREBASE_API_KEY", firebase.apiKey],
@@ -88,6 +104,8 @@ module.exports = {
       },
       package: "com.allconnect.app",
       versionCode: 2,
+      /** Lets the window shrink when the keyboard opens so ScrollView can reach password / buttons. */
+      softwareKeyboardLayoutMode: "resize",
       config: {
         googleMaps: { apiKey: mapsApiKeyAndroid },
       },
@@ -100,6 +118,7 @@ module.exports = {
       ],
       "expo-notifications",
       "@react-native-community/datetimepicker",
+      ...googleSignInPlugin,
     ],
   },
 };

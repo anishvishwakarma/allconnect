@@ -6,12 +6,11 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   KeyboardAvoidingView,
+  Keyboard,
   Platform,
   StyleSheet,
   Image,
   ScrollView,
-  Keyboard,
-  TouchableWithoutFeedback,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -69,7 +68,22 @@ export default function LoginScreen() {
   const [googleMobileGate, setGoogleMobileGate] = useState(false);
   const [googleMobileInput, setGoogleMobileInput] = useState("");
   const pendingGoogleUserRef = useRef<FirebaseUser | null>(null);
+  const scrollRef = useRef<ScrollView>(null);
   const googleOAuthReady = isGoogleOAuthConfigured();
+
+  function bumpScrollToEnd() {
+    requestAnimationFrame(() => {
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 120);
+    });
+  }
+
+  useEffect(() => {
+    const sub = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
+      () => bumpScrollToEnd()
+    );
+    return () => sub.remove();
+  }, []);
 
     // Pre-wake server (Render cold start) when login screen mounts
   useEffect(() => {
@@ -390,21 +404,22 @@ export default function LoginScreen() {
   return (
     <View style={[s.root, { backgroundColor: bg, paddingTop: insets.top }]}>
       <StatusBar style={isDark ? "light" : "dark"} />
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          style={s.flex1}
-          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={s.flex1}
+        keyboardVerticalOffset={Platform.OS === "ios" ? insets.top : 0}
+      >
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={[
+            s.scrollContent,
+            { paddingBottom: scrollBottom + 24 },
+          ]}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+          showsVerticalScrollIndicator={false}
+          bounces={false}
         >
-          <ScrollView
-            contentContainerStyle={[
-              s.scrollContent,
-              { paddingBottom: scrollBottom + 4 },
-            ]}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-            bounces={false}
-          >
           {/* Brand */}
           <View style={s.brandArea}>
             <View style={s.logoContainer}>
@@ -443,6 +458,7 @@ export default function LoginScreen() {
                   <TextInput
                     value={googleMobileInput}
                     onChangeText={(t) => setGoogleMobileInput(t.replace(/\D/g, "").slice(0, 10))}
+                    onFocus={bumpScrollToEnd}
                     placeholder="10-digit number"
                     placeholderTextColor={isDark ? "#555" : "#C0C0C0"}
                     keyboardType="phone-pad"
@@ -468,22 +484,6 @@ export default function LoginScreen() {
               </>
             ) : (
               <>
-                {mode !== "forgot" && googleOAuthReady ? (
-                  <>
-                    <GoogleSignInButton
-                      onIdToken={onGoogleIdToken}
-                      disabled={loading}
-                      borderColor={borderColor}
-                      backgroundColor={inputBg}
-                      textColor={textColor}
-                    />
-                    <View style={s.oauthOrRow}>
-                      <View style={[s.oauthOrLine, { backgroundColor: borderColor }]} />
-                      <Text style={[s.oauthOrText, { color: subColor }]}>or</Text>
-                      <View style={[s.oauthOrLine, { backgroundColor: borderColor }]} />
-                    </View>
-                  </>
-                ) : null}
                 <View style={s.sectionHeader}>
                   <View style={[s.sectionIcon, { backgroundColor: PRIMARY_LIGHT }]}>
                     <Ionicons name="mail-outline" size={18} color={PRIMARY} />
@@ -494,6 +494,7 @@ export default function LoginScreen() {
               <TextInput
                 value={email}
                 onChangeText={setEmail}
+                onFocus={bumpScrollToEnd}
                 placeholder="your@email.com"
                 placeholderTextColor={isDark ? "#555" : "#C0C0C0"}
                 keyboardType="email-address"
@@ -524,6 +525,7 @@ export default function LoginScreen() {
                   <TextInput
                     value={mobile}
                     onChangeText={(t) => setMobile(t.replace(/\D/g, "").slice(0, 10))}
+                    onFocus={bumpScrollToEnd}
                     placeholder="10-digit number"
                     placeholderTextColor={isDark ? "#555" : "#C0C0C0"}
                     keyboardType="phone-pad"
@@ -546,6 +548,7 @@ export default function LoginScreen() {
                   <TextInput
                     value={password}
                     onChangeText={setPassword}
+                    onFocus={bumpScrollToEnd}
                     placeholder="••••••••"
                     placeholderTextColor={isDark ? "#555" : "#C0C0C0"}
                     secureTextEntry={!showPassword}
@@ -657,6 +660,24 @@ export default function LoginScreen() {
                 </Text>
               </TouchableOpacity>
             </View>
+
+            {mode !== "forgot" && googleOAuthReady ? (
+              <View style={s.googleSection}>
+                <View style={s.oauthOrRowBottom}>
+                  <View style={[s.oauthOrLine, { backgroundColor: borderColor }]} />
+                  <Text style={[s.oauthOrText, { color: subColor }]}>or</Text>
+                  <View style={[s.oauthOrLine, { backgroundColor: borderColor }]} />
+                </View>
+                <GoogleSignInButton
+                  onIdToken={onGoogleIdToken}
+                  disabled={loading}
+                  borderColor={borderColor}
+                  backgroundColor={inputBg}
+                  textColor={textColor}
+                  onError={(msg) => alert.show("Google sign-in", msg, undefined, "error")}
+                />
+              </View>
+            ) : null}
               </>
             )}
           </View>
@@ -669,8 +690,7 @@ export default function LoginScreen() {
             <Text style={[s.footerText, { color: subColor }]}>Allpixel Technologies</Text>
           </View>
         </ScrollView>
-        </KeyboardAvoidingView>
-      </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
     </View>
   );
 }
@@ -776,11 +796,13 @@ const s = StyleSheet.create({
   dividerLine: { height: 1 },
   footerText: { fontSize: 12, fontWeight: "500", letterSpacing: 0.5 },
   googleGateTitle: { fontSize: 20, fontWeight: "700", marginBottom: 8 },
-  oauthOrRow: {
+  googleSection: {
+    marginTop: 22,
+  },
+  oauthOrRowBottom: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 16,
-    marginBottom: 2,
+    marginBottom: 14,
   },
   oauthOrLine: { flex: 1, height: StyleSheet.hairlineWidth },
   oauthOrText: { fontSize: 13, fontWeight: "600", marginHorizontal: 12 },
