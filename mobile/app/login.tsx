@@ -22,7 +22,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { GoogleSignInButton, isGoogleOAuthConfigured } from "../components/GoogleSignInSection";
 import { useAppTheme } from "../context/ThemeContext";
 import { useAlert } from "../context/AlertContext";
-import { API_URL } from "../constants/config";
+import { API_URL, getBottomInset } from "../constants/config";
 import { authApi } from "../services/api";
 import { useAuthStore } from "../store/auth";
 import {
@@ -49,13 +49,6 @@ function normalizeMobile(input: string): string {
   const digits = (input || "").replace(/\D/g, "");
   if (digits.length >= 10) return "+91" + digits.slice(-10);
   return "";
-}
-
-/** Login sits edge-to-edge at bottom; avoid double padding + huge Android nav gaps. */
-function loginScrollBottomInset(bottom: number): number {
-  if (Platform.OS === "ios") return Math.max(bottom, 12);
-  const b = Math.max(bottom, 8);
-  return Math.min(b, 24);
 }
 
 export default function LoginScreen() {
@@ -392,7 +385,7 @@ export default function LoginScreen() {
     }
   }
 
-  const scrollBottom = loginScrollBottomInset(insets.bottom);
+  const scrollBottom = getBottomInset(insets.bottom);
 
   return (
     <View style={[s.root, { backgroundColor: bg, paddingTop: insets.top }]}>

@@ -164,7 +164,7 @@ export default function ChatScreen() {
     );
   }
 
-  const safeBottom = Math.max(insets.bottom || 0, 0);
+  const safeBottom = getBottomInset(insets.bottom);
 
   return (
     <KeyboardAvoidingView behavior="padding" style={{ flex: 1, backgroundColor: bg }}>

@@ -1,5 +1,3 @@
-import { Platform } from 'react-native';
-
 /** REST + Socket base URL. Set EXPO_PUBLIC_API_URL in .env. Default: production (localhost only works when running backend locally) */
 export const API_URL =
   (process.env.EXPO_PUBLIC_API_URL as string | undefined)?.trim() || 'https://allconnect.onrender.com';
@@ -49,17 +47,13 @@ export const USE_MOCK_OTP =
 /** India: mobile number must be exactly 10 digits (after +91) */
 export const INDIA_MOBILE_LENGTH = 10;
 
-/** Minimum bottom inset for Android so tab bar / content never touches system nav (home, back, recent). */
-export const ANDROID_NAV_BAR_FALLBACK = 56;
-
-/** Returns bottom inset, using fallback on Android when SafeArea reports 0. Use for tab bar and main app content. */
+/**
+ * Bottom safe inset from the OS (navigation bar / home indicator / tablet taskbar).
+ * When there is no system nav inset, this is 0 — layout can use the full height.
+ * When back / home / recent (or gesture bar / iPhone home indicator) is present, use the returned value so UI does not overlap.
+ */
 export function getBottomInset(bottom: number): number {
-  return Math.max(bottom, Platform.OS === 'android' ? ANDROID_NAV_BAR_FALLBACK : 0);
-}
-
-/** Smaller bottom inset for login/register so there's no large grey strip above system nav. */
-export function getContentBottomInset(bottom: number): number {
-  return Math.max(bottom, Platform.OS === 'android' ? 12 : 0);
+  return Math.max(0, bottom);
 }
 
 /** Public privacy policy URL (required for store listings; also used in-app for "View full policy"). */
