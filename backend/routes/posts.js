@@ -2,6 +2,11 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../db');
 const { authMiddleware } = require('../middleware/auth');
+const {
+  rateLimitPostsNearby,
+  rateLimitPostsGetById,
+  rateLimitPostCreate,
+} = require('../middleware/rateLimiter');
 
 const router = express.Router();
 const VALID_PRIVACY_TYPES = new Set(['public', 'approval']);
@@ -28,7 +33,7 @@ function postRowToJson(r) {
 }
 
 // GET /api/posts/nearby?lat=&lng=&radius_km=15&category=&from=&to=
-router.get('/nearby', async (req, res) => {
+router.get('/nearby', rateLimitPostsNearby, async (req, res) => {
   try {
     const lat = parseFloat(req.query.lat);
     const lng = parseFloat(req.query.lng);
@@ -97,7 +102,7 @@ router.get('/history/list', authMiddleware, async (req, res) => {
 });
 
 // GET /api/posts/:id
-router.get('/:id', async (req, res) => {
+router.get('/:id', rateLimitPostsGetById, async (req, res) => {
   try {
     const post = await db.row('SELECT * FROM posts WHERE id = $1', [req.params.id]);
     if (!post) return res.status(404).json({ error: 'Post not found' });
@@ -109,7 +114,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /api/posts (auth)
-router.post('/', authMiddleware, async (req, res) => {
+router.post('/', authMiddleware, rateLimitPostCreate, async (req, res) => {
   try {
     const body = req.body || {};
     const {

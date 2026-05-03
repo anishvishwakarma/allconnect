@@ -3,6 +3,7 @@ const { v4: uuidv4 } = require('uuid');
 const db = require('../db');
 const { authMiddleware } = require('../middleware/auth');
 const { sendPushToUser } = require('../services/notifications');
+const { rateLimitRequestWrites } = require('../middleware/rateLimiter');
 
 const router = express.Router({ mergeParams: true });
 
@@ -44,7 +45,7 @@ async function ensureGroupChatForPost(client, post) {
 }
 
 // POST /api/posts/:postId/request
-router.post('/request', authMiddleware, async (req, res) => {
+router.post('/request', authMiddleware, rateLimitRequestWrites, async (req, res) => {
   try {
     const postId = req.params.postId;
     const post = await db.row(
@@ -198,7 +199,7 @@ router.get('/my-request', authMiddleware, async (req, res) => {
 });
 
 // POST /api/posts/:postId/approve
-router.post('/approve', authMiddleware, async (req, res) => {
+router.post('/approve', authMiddleware, rateLimitRequestWrites, async (req, res) => {
   try {
     const postId = req.params.postId;
     const userId = req.body?.user_id;
@@ -291,7 +292,7 @@ router.post('/approve', authMiddleware, async (req, res) => {
 });
 
 // POST /api/posts/:postId/reject
-router.post('/reject', authMiddleware, async (req, res) => {
+router.post('/reject', authMiddleware, rateLimitRequestWrites, async (req, res) => {
   try {
     const postId = req.params.postId;
     const userId = req.body?.user_id;

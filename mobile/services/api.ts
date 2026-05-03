@@ -82,7 +82,8 @@ async function authRequestWithRetry<T>(
         msg.includes('Invalid or expired token') ||
         msg.includes('Invalid email or password') ||
         msg.includes('Service temporarily unavailable') ||
-        msg.includes('Firebase not configured');
+        msg.includes('Firebase not configured') ||
+        msg.includes('Too many requests');
       const isRetryable =
         !isAuthOrConfigFailure &&
         (msg.includes('Network') ||

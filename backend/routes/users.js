@@ -3,6 +3,12 @@ const db = require('../db');
 const { authMiddleware } = require('../middleware/auth');
 const { uploadAvatar } = require('../services/storage');
 const { verifyIdToken, deleteUser } = require('../services/firebase');
+const {
+  rateLimitAvatar,
+  rateLimitPushToken,
+  rateLimitUserProfilePatch,
+  rateLimitAccountDelete,
+} = require('../middleware/rateLimiter');
 
 const router = express.Router();
 
@@ -55,7 +61,7 @@ router.get('/me', async (req, res) => {
 });
 
 // POST /api/users/avatar — upload avatar image (base64), returns { avatar_uri }
-router.post('/avatar', async (req, res) => {
+router.post('/avatar', rateLimitAvatar, async (req, res) => {
   try {
     const image = req.body?.image;
     if (!image || typeof image !== 'string') {
@@ -94,7 +100,7 @@ router.post('/avatar', async (req, res) => {
 });
 
 // POST /api/users/push-token — register Expo push token
-router.post('/push-token', async (req, res) => {
+router.post('/push-token', rateLimitPushToken, async (req, res) => {
   try {
     const token = (req.body?.token || '').trim();
     const platform = (req.body?.platform || 'unknown').trim();
@@ -118,7 +124,7 @@ router.post('/push-token', async (req, res) => {
 });
 
 // DELETE /api/users/push-token — unregister Expo push token
-router.delete('/push-token', async (req, res) => {
+router.delete('/push-token', rateLimitPushToken, async (req, res) => {
   try {
     const token = (req.body?.token || '').trim();
     if (!token) return res.status(400).json({ error: 'token required' });
@@ -131,7 +137,7 @@ router.delete('/push-token', async (req, res) => {
 });
 
 // PATCH /api/users/me
-router.patch('/me', async (req, res) => {
+router.patch('/me', rateLimitUserProfilePatch, async (req, res) => {
   try {
     const { name, avatar_uri } = req.body || {};
     const updates = [];
@@ -164,7 +170,7 @@ router.patch('/me', async (req, res) => {
 });
 
 // DELETE /api/users/me — Delete account and all associated data (Play/App Store requirement)
-router.delete('/me', async (req, res) => {
+router.delete('/me', rateLimitAccountDelete, async (req, res) => {
   try {
     const userId = req.userId;
     const user = await db.row('SELECT id, firebase_uid FROM users WHERE id = $1', [userId]);

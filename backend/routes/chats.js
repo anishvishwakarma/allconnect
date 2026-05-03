@@ -2,6 +2,7 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../db');
 const { authMiddleware } = require('../middleware/auth');
+const { rateLimitChatMessage } = require('../middleware/rateLimiter');
 
 const router = express.Router();
 
@@ -74,7 +75,7 @@ router.get('/groups/:groupId/messages', authMiddleware, async (req, res) => {
 });
 
 // POST /api/chats/groups/:groupId/messages
-router.post('/groups/:groupId/messages', authMiddleware, async (req, res) => {
+router.post('/groups/:groupId/messages', authMiddleware, rateLimitChatMessage, async (req, res) => {
   try {
     const groupId = req.params.groupId;
     const body = (req.body?.body || '').trim();

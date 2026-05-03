@@ -2,7 +2,7 @@
  * Rate limit for auth helpers (email-for-login, etc.) - by IP
  */
 const windowMs = 15 * 60 * 1000;
-const maxPerWindow = 15;
+const maxPerWindow = 28;
 const store = new Map();
 
 function cleanup() {

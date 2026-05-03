@@ -2,12 +2,12 @@ const express = require('express');
 
 const router = express.Router();
 
-const { rateLimitAuth } = require('../middleware/rateLimitAuth');
+const { rateLimitPlacesSearch } = require('../middleware/rateLimiter');
 
 const MAX_QUERY_LEN = 120;
 
 // GET /api/places/search?q=
-router.get('/search', rateLimitAuth, async (req, res) => {
+router.get('/search', rateLimitPlacesSearch, async (req, res) => {
   try {
     const q = (req.query.q || '').toString().trim();
     if (!q) {
