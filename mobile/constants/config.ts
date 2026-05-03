@@ -65,5 +65,9 @@ export function getContentBottomInset(bottom: number): number {
 /** Public privacy policy URL (required for store listings; also used in-app for "View full policy"). */
 export const PRIVACY_POLICY_URL = 'https://allpixel.in/privacy%20policy.html';
 
-/** Where to send user after completing password reset (must be in Firebase Auth → Authorized domains). */
-export const PASSWORD_RESET_CONTINUE_URL = 'https://allpixel.in/';
+/**
+ * After reset in the browser, Firebase redirects here. Must be a real HTTPS page (Firebase requirement).
+ * Host `web/password-reset-done.html` from the repo at this path on your site (or change URL + deploy).
+ * Firebase Console → Authentication → Settings → Authorized domains → include the hostname (e.g. allpixel.in).
+ */
+export const PASSWORD_RESET_CONTINUE_URL = 'https://allpixel.in/password-reset-done.html';

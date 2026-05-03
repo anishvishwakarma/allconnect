@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  ActivityIndicator, Dimensions, TextInput,
+  ActivityIndicator, Dimensions, TextInput, Animated,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import MapView, { Marker, PROVIDER_GOOGLE, MapMarkerProps } from "react-native-maps";
@@ -40,6 +40,206 @@ function getDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
+const CATEGORY_MARKER_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
+  activity: "bicycle",
+  need: "heart",
+  selling: "pricetag",
+  meetup: "people",
+  event: "calendar",
+  study: "school",
+  nightlife: "moon",
+  other: "location",
+};
+
+const ms = StyleSheet.create({
+  pinStack: {
+    alignItems: "center",
+    justifyContent: "flex-end",
+    width: 58,
+    height: 64,
+  },
+  pulseRing: {
+    position: "absolute",
+    top: 2,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    borderWidth: 2.5,
+    alignSelf: "center",
+  },
+  pinUpper: { alignItems: "center" },
+  pinBubble: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    borderWidth: 3,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.28,
+    shadowRadius: 6,
+    elevation: 10,
+  },
+  pinBubbleInner: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pinTail: {
+    width: 0,
+    height: 0,
+    marginTop: -4,
+    borderLeftWidth: 10,
+    borderRightWidth: 10,
+    borderTopWidth: 13,
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+  },
+});
+
+function MapPinBubble({
+  color,
+  icon,
+  selected,
+  pulse,
+}: {
+  color: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  selected: boolean;
+  pulse: boolean;
+}) {
+  const drop = useRef(new Animated.Value(0)).current;
+  const fade = useRef(new Animated.Value(0)).current;
+  const ring = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    drop.setValue(-40);
+    fade.setValue(0);
+    ring.setValue(1);
+    Animated.parallel([
+      Animated.spring(drop, {
+        toValue: 0,
+        friction: 7,
+        tension: 220,
+        useNativeDriver: true,
+      }),
+      Animated.timing(fade, { toValue: 1, duration: 140, useNativeDriver: true }),
+    ]).start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- entrance only on mount / marker remount (keyed by id)
+  }, []);
+
+  useEffect(() => {
+    if (!pulse) return;
+    ring.setValue(1);
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(ring, { toValue: 1.5, duration: 480, useNativeDriver: true }),
+        Animated.timing(ring, { toValue: 1, duration: 480, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    const stop = setTimeout(() => {
+      loop.stop();
+      ring.setValue(1);
+    }, 2600);
+    return () => {
+      loop.stop();
+      clearTimeout(stop);
+    };
+  }, [pulse, ring]);
+
+  const scale = selected ? 1.14 : 1;
+
+  return (
+    <Animated.View
+      style={[
+        ms.pinStack,
+        {
+          opacity: fade,
+          transform: [{ translateY: drop }, { scale }],
+        },
+      ]}
+      collapsable={false}
+    >
+      {pulse ? (
+        <Animated.View
+          style={[
+            ms.pulseRing,
+            {
+              borderColor: color,
+              transform: [{ scale: ring }],
+              opacity: ring.interpolate({
+                inputRange: [1, 1.5],
+                outputRange: [0.5, 0.08],
+              }),
+            },
+          ]}
+        />
+      ) : null}
+      <View style={ms.pinUpper}>
+        <View style={[ms.pinBubble, { borderColor: color, shadowColor: "#000000" }]}>
+          <View style={[ms.pinBubbleInner, { backgroundColor: color }]}>
+            <Ionicons name={icon} size={21} color="#FFFFFF" />
+          </View>
+        </View>
+        <View style={[ms.pinTail, { borderTopColor: color }]} />
+      </View>
+    </Animated.View>
+  );
+}
+
+function EventMapMarker({
+  pin,
+  selected,
+  pulse,
+  onPress,
+}: {
+  pin: { id: string; lat: number; lng: number; category?: string };
+  selected: boolean;
+  pulse: boolean;
+  onPress: () => void;
+}) {
+  const [tracksViewChanges, setTracksViewChanges] = useState(true);
+  useEffect(() => {
+    setTracksViewChanges(true);
+    const delay = pulse ? 3400 : 1000;
+    const t = setTimeout(() => setTracksViewChanges(false), delay);
+    return () => clearTimeout(t);
+  }, [pulse, pin.id]);
+  const color = CATEGORY_COLORS[pin.category ?? ""] || PRIMARY;
+  const icon = CATEGORY_MARKER_ICONS[pin.category ?? ""] ?? "location";
+  return (
+    <AnyMarker
+      coordinate={{ latitude: pin.lat, longitude: pin.lng }}
+      anchor={{ x: 0.5, y: 1 }}
+      tracksViewChanges={tracksViewChanges}
+      onPress={onPress}
+    >
+      <MapPinBubble color={color} icon={icon} selected={selected} pulse={pulse} />
+    </AnyMarker>
+  );
+}
+
+function DraftMapMarker({
+  coordinate,
+}: {
+  coordinate: { latitude: number; longitude: number };
+}) {
+  const [tracksViewChanges, setTracksViewChanges] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setTracksViewChanges(false), 1200);
+    return () => clearTimeout(t);
+  }, []);
+  return (
+    <AnyMarker coordinate={coordinate} anchor={{ x: 0.5, y: 1 }} tracksViewChanges={tracksViewChanges}>
+      <MapPinBubble color={PRIMARY} icon="add" selected={false} pulse={false} />
+    </AnyMarker>
+  );
+}
+
 export default function MapScreen() {
   const insets = useSafeAreaInsets();
   const token = useAuthStore((s) => s.token);
@@ -71,6 +271,9 @@ export default function MapScreen() {
   regionRef.current = region;
   const regionFetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mapRef = useRef<MapView>(null);
+  const lastPinIdsRef = useRef<Set<string>>(new Set());
+  const freshPinsClearRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [freshPinIds, setFreshPinIds] = useState<Set<string>>(new Set());
 
   const fetchPins = useCallback(async () => {
     setLoading(true);
@@ -90,7 +293,24 @@ export default function MapScreen() {
       params.from = sat.toISOString(); params.to = sun.toISOString();
     }
     try {
-      setPins(await postsApi.nearby(latitude, longitude, 15, params));
+      const data = await postsApi.nearby(latitude, longitude, 15, params);
+      const nextIds = new Set(data.map((p: { id: string }) => String(p.id)));
+      if (lastPinIdsRef.current.size > 0) {
+        const added: string[] = [];
+        nextIds.forEach((id) => {
+          if (!lastPinIdsRef.current.has(id)) added.push(id);
+        });
+        if (added.length) {
+          if (freshPinsClearRef.current) clearTimeout(freshPinsClearRef.current);
+          setFreshPinIds(new Set(added));
+          freshPinsClearRef.current = setTimeout(() => {
+            setFreshPinIds(new Set());
+            freshPinsClearRef.current = null;
+          }, 3200);
+        }
+      }
+      lastPinIdsRef.current = nextIds;
+      setPins(data);
     } catch {
       // Keep previous pins on network/API failure; loading state cleared below
     }
@@ -98,6 +318,15 @@ export default function MapScreen() {
   }, [filter]);
 
   useEffect(() => { fetchPins(); }, [fetchPins]);
+
+  useEffect(() => {
+    lastPinIdsRef.current = new Set();
+    setFreshPinIds(new Set());
+    if (freshPinsClearRef.current) {
+      clearTimeout(freshPinsClearRef.current);
+      freshPinsClearRef.current = null;
+    }
+  }, [filter.category, filter.when]);
 
   useEffect(() => {
     const id = setInterval(fetchPins, AUTO_REFRESH_INTERVAL_MS);
@@ -299,24 +528,22 @@ export default function MapScreen() {
         }}
       >
         {draftPin && (
-          <AnyMarker
+          <DraftMapMarker
+            key={`${draftPin.latitude.toFixed(5)}_${draftPin.longitude.toFixed(5)}`}
             coordinate={draftPin}
-          >
-            <View style={[s.markerOuter, { borderColor: "#111111" }]}>
-              <View style={[s.markerInner, { backgroundColor: "#111111" }]} />
-            </View>
-          </AnyMarker>
+          />
         )}
         {pins.map((pin) => (
-          <AnyMarker
+          <EventMapMarker
             key={pin.id}
-            coordinate={{ latitude: pin.lat, longitude: pin.lng }}
+            pin={pin}
+            selected={selectedPin?.id === pin.id}
+            pulse={freshPinIds.has(String(pin.id))}
             onPress={() => {
               lastPinTapAtRef.current = Date.now();
               setDraftPin(null);
               setSelectedPin(pin);
               setReqDone(false);
-              // Momo-style: center map on selected pin for clear pin–card connection
               if (pin?.lat != null && pin?.lng != null) {
                 mapRef.current?.animateToRegion({
                   latitude: pin.lat,
@@ -326,11 +553,7 @@ export default function MapScreen() {
                 }, 300);
               }
             }}
-          >
-            <View style={[s.markerOuter, { borderColor: CATEGORY_COLORS[pin.category] || PRIMARY }]}>
-              <View style={[s.markerInner, { backgroundColor: CATEGORY_COLORS[pin.category] || PRIMARY }]} />
-            </View>
-          </AnyMarker>
+          />
         ))}
       </MapView>
 
@@ -644,8 +867,6 @@ function PinMeta({ icon, value, sub }: { icon: any; value: string; sub: string }
 }
 
 const s = StyleSheet.create({
-  markerOuter: { width: 22, height: 22, borderRadius: 11, borderWidth: 2.5, alignItems: "center", justifyContent: "center", backgroundColor: "#fff" },
-  markerInner: { width: 10, height: 10, borderRadius: 5 },
   filtersContainer: { position: "absolute", left: 0, right: 0, paddingVertical: 8 },
   searchBar: {
     marginHorizontal: 16,

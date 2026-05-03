@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -15,7 +15,10 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
+import * as WebBrowser from "expo-web-browser";
+import type { User as FirebaseUser } from "firebase/auth";
 import { Ionicons } from "@expo/vector-icons";
+import { GoogleSignInButton, isGoogleOAuthConfigured } from "../components/GoogleSignInSection";
 import { useAppTheme } from "../context/ThemeContext";
 import { useAlert } from "../context/AlertContext";
 import { API_URL } from "../constants/config";
@@ -26,7 +29,11 @@ import {
   signInWithEmail,
   getIdToken,
   sendPasswordReset,
+  signInWithGoogleIdToken,
+  signOutFirebase,
 } from "../services/firebaseAuth";
+
+WebBrowser.maybeCompleteAuthSession();
 
 const PRIMARY = "#E8751A";
 const PRIMARY_LIGHT = "#FFF3E8";
@@ -58,6 +65,10 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingHint, setLoadingHint] = useState("");
+  const [googleMobileGate, setGoogleMobileGate] = useState(false);
+  const [googleMobileInput, setGoogleMobileInput] = useState("");
+  const pendingGoogleUserRef = useRef<FirebaseUser | null>(null);
+  const googleOAuthReady = isGoogleOAuthConfigured();
 
     // Pre-wake server (Render cold start) when login screen mounts
   useEffect(() => {
@@ -250,6 +261,94 @@ export default function LoginScreen() {
     }
   }
 
+  const onGoogleIdToken = useCallback(
+    async (idToken: string) => {
+      setLoading(true);
+      setLoadingHint("");
+      try {
+        const cred = await signInWithGoogleIdToken(idToken);
+        const idTok = await getIdToken(cred.user);
+        try {
+          const { token, user } = await authApi.firebaseLogin(idTok);
+          setAuth(token, user);
+          router.replace(user.name?.trim() ? "/(tabs)/map" : "/complete-profile");
+        } catch (e: any) {
+          const msg = e?.message || "";
+          if (msg.includes("Mobile number required")) {
+            pendingGoogleUserRef.current = cred.user;
+            setGoogleMobileGate(true);
+            setGoogleMobileInput("");
+            return;
+          }
+          throw e;
+        }
+      } catch (err: any) {
+        const msg = err?.message || "Google sign-in failed.";
+        if (msg.includes("account-exists-with-different-credential"))
+          alert.show(
+            "Account exists",
+            "This email is already registered with email and password. Sign in with email instead, or use the same Google account you used before.",
+            [{ text: "OK", onPress: () => setMode("signin") }],
+            "info"
+          );
+        else if (msg.includes("invalid-credential") || msg.includes("Invalid or expired token"))
+          alert.show("Sign in failed", "Could not verify with Google. Try again.", undefined, "error");
+        else if (msg.includes("Network") || msg.includes("Failed to fetch"))
+          alert.show("Connection error", "Check your internet and try again.", undefined, "error");
+        else if (msg.includes("Mobile number already"))
+          alert.show("Mobile in use", "This mobile number is already registered.", undefined, "error");
+        else if (msg.includes("Service temporarily unavailable") || msg.includes("Firebase not configured"))
+          alert.show(
+            "Server setup",
+            "The app is being configured. Please try again in a minute or contact support.",
+            undefined,
+            "error"
+          );
+        else alert.show("Google sign-in", msg, undefined, "error");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [alert, setAuth]
+  );
+
+  async function submitGoogleMobile() {
+    const u = pendingGoogleUserRef.current;
+    if (!u) {
+      setGoogleMobileGate(false);
+      return;
+    }
+    const mob = normalizeMobile(googleMobileInput);
+    if (!mob) {
+      alert.show("Invalid mobile", "Please enter a valid 10-digit mobile number.", undefined, "info");
+      return;
+    }
+    setLoading(true);
+    try {
+      const idTok = await getIdToken(u);
+      const { token, user } = await authApi.firebaseLogin(idTok, mob);
+      pendingGoogleUserRef.current = null;
+      setGoogleMobileGate(false);
+      setGoogleMobileInput("");
+      setAuth(token, user);
+      router.replace(user.name?.trim() ? "/(tabs)/map" : "/complete-profile");
+    } catch (err: any) {
+      const msg = err?.message || "";
+      if (msg.includes("Mobile number already"))
+        alert.show("Mobile in use", "This mobile number is already registered.", undefined, "error");
+      else alert.show("Something went wrong", msg || "Please try again.", undefined, "error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function cancelGoogleMobile() {
+    pendingGoogleUserRef.current = null;
+    setGoogleMobileGate(false);
+    setGoogleMobileInput("");
+    await signOutFirebase();
+  }
+
   async function handleForgotPassword() {
     const e = email.trim().toLowerCase();
     if (!e) {
@@ -315,12 +414,74 @@ export default function LoginScreen() {
 
           {/* Card */}
           <View style={[s.card, { backgroundColor: surface, borderColor: borderColor }]}>
-            <View style={s.sectionHeader}>
-              <View style={[s.sectionIcon, { backgroundColor: PRIMARY_LIGHT }]}>
-                <Ionicons name="mail-outline" size={18} color={PRIMARY} />
-              </View>
-              <Text style={[s.sectionTitle, { color: textColor }]}>Email</Text>
-            </View>
+            {googleMobileGate ? (
+              <>
+                <Text style={[s.googleGateTitle, { color: textColor }]}>Almost done</Text>
+                <Text style={[s.sectionSubtext, { color: subColor, marginBottom: 16 }]}>
+                  Enter your 10-digit mobile number — same as when you sign up with email. We use it for your AllConnect account.
+                </Text>
+                <View
+                  style={[
+                    s.inputWrapper,
+                    {
+                      backgroundColor: inputBg,
+                      borderColor: normalizeMobile(googleMobileInput).length >= 13 ? PRIMARY : borderColor,
+                      flexDirection: "row",
+                      alignItems: "center",
+                    },
+                  ]}
+                >
+                  <Text style={[s.mobilePrefix, { color: subColor }]}>+91 </Text>
+                  <TextInput
+                    value={googleMobileInput}
+                    onChangeText={(t) => setGoogleMobileInput(t.replace(/\D/g, "").slice(0, 10))}
+                    placeholder="10-digit number"
+                    placeholderTextColor={isDark ? "#555" : "#C0C0C0"}
+                    keyboardType="phone-pad"
+                    maxLength={10}
+                    style={[s.input, { color: textColor, flex: 1 }]}
+                  />
+                </View>
+                <TouchableOpacity
+                  onPress={submitGoogleMobile}
+                  disabled={loading}
+                  style={s.primaryButton}
+                  activeOpacity={0.85}
+                >
+                  {loading ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={s.primaryButtonText}>Continue</Text>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity onPress={cancelGoogleMobile} style={s.cancelGoogle} disabled={loading}>
+                  <Text style={[s.linkText, { color: subColor }]}>Cancel</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                {mode !== "forgot" && googleOAuthReady ? (
+                  <>
+                    <GoogleSignInButton
+                      onIdToken={onGoogleIdToken}
+                      disabled={loading}
+                      borderColor={borderColor}
+                      backgroundColor={inputBg}
+                      textColor={textColor}
+                    />
+                    <View style={s.oauthOrRow}>
+                      <View style={[s.oauthOrLine, { backgroundColor: borderColor }]} />
+                      <Text style={[s.oauthOrText, { color: subColor }]}>or</Text>
+                      <View style={[s.oauthOrLine, { backgroundColor: borderColor }]} />
+                    </View>
+                  </>
+                ) : null}
+                <View style={s.sectionHeader}>
+                  <View style={[s.sectionIcon, { backgroundColor: PRIMARY_LIGHT }]}>
+                    <Ionicons name="mail-outline" size={18} color={PRIMARY} />
+                  </View>
+                  <Text style={[s.sectionTitle, { color: textColor }]}>Email</Text>
+                </View>
             <View style={[s.inputWrapper, { backgroundColor: inputBg, borderColor: isEmail(email) ? PRIMARY : borderColor }]}>
               <TextInput
                 value={email}
@@ -488,6 +649,8 @@ export default function LoginScreen() {
                 </Text>
               </TouchableOpacity>
             </View>
+              </>
+            )}
           </View>
 
           {/* Footer */}
@@ -601,4 +764,14 @@ const s = StyleSheet.create({
   footerDivider: { width: 40, marginBottom: 12 },
   dividerLine: { height: 1 },
   footerText: { fontSize: 12, fontWeight: "500", letterSpacing: 0.5 },
+  googleGateTitle: { fontSize: 20, fontWeight: "700", marginBottom: 8 },
+  oauthOrRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 20,
+    marginBottom: 4,
+  },
+  oauthOrLine: { flex: 1, height: StyleSheet.hairlineWidth },
+  oauthOrText: { fontSize: 13, fontWeight: "600", marginHorizontal: 12 },
+  cancelGoogle: { marginTop: 16, alignSelf: "center", paddingVertical: 8 },
 });

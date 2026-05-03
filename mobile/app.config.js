@@ -19,6 +19,13 @@ const firebase = {
   appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID || "",
 };
 
+// Google Sign-In (OAuth client IDs from Google Cloud / Firebase). Optional until you set env vars.
+const google = {
+  webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || "",
+  iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || "",
+  androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || "",
+};
+
 const requiredEnv = [
   ["EXPO_PUBLIC_GOOGLE_MAPS_API_KEY", mapsApiKey],
   ["EXPO_PUBLIC_FIREBASE_API_KEY", firebase.apiKey],
@@ -51,6 +58,7 @@ module.exports = {
         projectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID || "58c0688a-478a-4e60-b4ec-cdb78d108e11",
       },
       firebase,
+      google,
     },
     slug: "allconnect",
     version: "1.1.0",

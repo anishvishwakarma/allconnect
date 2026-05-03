@@ -10,6 +10,8 @@ import {
   signInWithEmailAndPassword,
   sendEmailVerification,
   sendPasswordResetEmail,
+  GoogleAuthProvider,
+  signInWithCredential,
   getAuth,
   initializeAuth,
   signOut,
@@ -75,6 +77,13 @@ export async function signUpWithEmail(email: string, password: string): Promise<
 export async function signInWithEmail(email: string, password: string): Promise<UserCredential> {
   const auth = getFirebaseAuthInstance();
   return signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
+}
+
+/** Google ID token from expo-auth-session / native Google sign-in → Firebase session. */
+export async function signInWithGoogleIdToken(idToken: string): Promise<UserCredential> {
+  const auth = getFirebaseAuthInstance();
+  const credential = GoogleAuthProvider.credential(idToken);
+  return signInWithCredential(auth, credential);
 }
 
 export async function getIdToken(user: User): Promise<string> {
