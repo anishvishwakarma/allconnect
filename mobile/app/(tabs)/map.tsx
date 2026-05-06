@@ -689,6 +689,23 @@ export default function MapScreen() {
               </TouchableOpacity>
             ))}
             <View style={[s.divider, { backgroundColor: border }]} />
+            <TouchableOpacity
+              onPress={() => {
+                setLoading(true);
+                setFilter((f) => ({ ...f, category: undefined }));
+              }}
+              style={[
+                s.chip,
+                {
+                  backgroundColor: !filter.category ? PRIMARY : surface,
+                  borderColor: !filter.category ? PRIMARY : border,
+                },
+              ]}
+            >
+              <Text style={[s.chipText, { color: !filter.category ? "#fff" : text }]} numberOfLines={1}>
+                All
+              </Text>
+            </TouchableOpacity>
             {CATEGORIES.map((cat) => (
               <TouchableOpacity
                 key={cat}
