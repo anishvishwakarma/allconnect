@@ -44,6 +44,19 @@ export default function ChatsScreen() {
     return `${m}m left`;
   }
 
+  function isExpired(expiresAt: string) {
+    return new Date(expiresAt).getTime() <= Date.now();
+  }
+
+  const activeGroups = groups.filter((item) => {
+    const expiresAt = item.expires_at ?? item.expiresAt;
+    return expiresAt ? !isExpired(expiresAt) : true;
+  });
+  const archivedGroups = groups.filter((item) => {
+    const expiresAt = item.expires_at ?? item.expiresAt;
+    return expiresAt ? isExpired(expiresAt) : false;
+  });
+
   if (!token) {
     return (
       <View style={[s.center, { backgroundColor: bg, paddingTop: insets.top, paddingBottom: getBottomInset(insets.bottom) }]}>
@@ -61,61 +74,84 @@ export default function ChatsScreen() {
     <View style={{ flex: 1, backgroundColor: bg }}>
       <View style={[s.header, { borderBottomColor: border, paddingTop: insets.top + 16 }]}>
         <Text style={[s.title, { color: text }]}>Chats</Text>
-        <Text style={[s.subtitle, { color: sub }]}>Active group chats · auto-delete after event</Text>
+        <Text style={[s.subtitle, { color: sub }]}>Your group chats · archived after event (read-only)</Text>
       </View>
       {loading ? (
         <View style={s.center}><ActivityIndicator color={PRIMARY} size="large" /></View>
       ) : (
         <FlatList
-          data={groups}
+          data={[...activeGroups, ...archivedGroups]}
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: getBottomInset(insets.bottom) + 40 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={PRIMARY} />}
           ListEmptyComponent={
             <View style={[s.center, { paddingTop: 60 }]}>
               <Ionicons name="chatbubble-ellipses-outline" size={56} color={isDark ? "#2C2C2F" : "#E5E5EA"} />
-              <Text style={[s.emptyTitle, { color: text }]}>No active chats</Text>
+              <Text style={[s.emptyTitle, { color: text }]}>No chats yet</Text>
               <Text style={[s.emptySub, { color: sub }]}>Join a post and get approved to start chatting</Text>
               <TouchableOpacity onPress={() => router.push("/(tabs)/map")} style={s.cta}>
                 <Text style={s.ctaText}>Find Events</Text>
               </TouchableOpacity>
             </View>
           }
-          renderItem={({ item }) => {
+          ListHeaderComponent={
+            groups.length > 0 ? (
+              <View style={{ gap: 10, marginBottom: 8 }}>
+                {activeGroups.length > 0 && <Text style={[s.sectionTitle, { color: text }]}>Active</Text>}
+                {activeGroups.length === 0 && archivedGroups.length > 0 && (
+                  <Text style={[s.sectionTitle, { color: text }]}>Archived</Text>
+                )}
+              </View>
+            ) : null
+          }
+          renderItem={({ item, index }) => {
             const catColor = CATEGORY_COLORS[item.category] || PRIMARY;
             const expiresAt = item.expires_at ?? item.expiresAt;
-            const remaining = timeRemaining(expiresAt);
-            const isExpiringSoon = new Date(expiresAt).getTime() - Date.now() < 3600000;
+            const expired = expiresAt ? isExpired(expiresAt) : false;
+            const remaining = expiresAt ? timeRemaining(expiresAt) : "";
+            const isExpiringSoon = expiresAt ? (new Date(expiresAt).getTime() - Date.now() < 3600000 && !expired) : false;
+            const isFirstArchivedItem = archivedGroups.length > 0 && index === activeGroups.length;
+
             return (
-              <TouchableOpacity
-                onPress={() => router.push(`/chat/${item.id}`)}
-                style={[s.card, { backgroundColor: surface, borderColor: border }]}
-                activeOpacity={0.75}
-              >
-                <View style={[s.avatar, { backgroundColor: catColor + "18" }]}>
-                  <Ionicons name="people" size={22} color={catColor} />
-                </View>
-                <View style={{ flex: 1, marginLeft: 14 }}>
-                  <Text style={[s.chatName, { color: text }]} numberOfLines={1}>{item.title || item.name}</Text>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 }}>
-                    <View style={[s.catChip, { backgroundColor: catColor + "18" }]}>
-                      <Text style={[s.catChipText, { color: catColor }]}>{item.category}</Text>
+              <>
+                {isFirstArchivedItem && activeGroups.length > 0 && (
+                  <Text style={[s.sectionTitle, { color: text, marginTop: 6 }]}>Archived</Text>
+                )}
+                <TouchableOpacity
+                  onPress={() => router.push(`/chat/${item.id}`)}
+                  style={[s.card, { backgroundColor: surface, borderColor: border }]}
+                  activeOpacity={0.75}
+                >
+                  <View style={[s.avatar, { backgroundColor: catColor + "18" }]}>
+                    <Ionicons name="people" size={22} color={catColor} />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 14 }}>
+                    <Text style={[s.chatName, { color: text }]} numberOfLines={1}>{item.title || item.name}</Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 }}>
+                      <View style={[s.catChip, { backgroundColor: catColor + "18" }]}>
+                        <Text style={[s.catChipText, { color: catColor }]}>{item.category}</Text>
+                      </View>
+                      <Text style={[s.meta, { color: sub }]}>
+                        {(item.event_at ?? item.eventAt) ? new Date(item.event_at ?? item.eventAt).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : ""}
+                      </Text>
+                      {expired && (
+                        <View style={s.readOnlyPill}>
+                          <Text style={s.readOnlyPillText}>Ended · Read-only</Text>
+                        </View>
+                      )}
                     </View>
-                    <Text style={[s.meta, { color: sub }]}>
-                      {(item.event_at ?? item.eventAt) ? new Date(item.event_at ?? item.eventAt).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : ""}
-                    </Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 }}>
+                      <Ionicons name={expired ? "lock-closed-outline" : "timer-outline"} size={12} color={expired ? "#FF453A" : (isExpiringSoon ? "#FF453A" : sub)} />
+                      <Text style={[s.meta, { color: expired ? "#FF453A" : (isExpiringSoon ? "#FF453A" : sub), fontWeight: (isExpiringSoon || expired) ? "600" : "400" }]}>
+                        {expired ? "Read-only chat" : remaining}
+                      </Text>
+                    </View>
                   </View>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 }}>
-                    <Ionicons name="timer-outline" size={12} color={isExpiringSoon ? "#FF453A" : sub} />
-                    <Text style={[s.meta, { color: isExpiringSoon ? "#FF453A" : sub, fontWeight: isExpiringSoon ? "600" : "400" }]}>
-                      {remaining}
-                    </Text>
+                  <View style={[s.arrow, { backgroundColor: isDark ? "#2C2C2F" : "#F0F0F3" }]}>
+                    <Ionicons name="chevron-forward" size={14} color={sub} />
                   </View>
-                </View>
-                <View style={[s.arrow, { backgroundColor: isDark ? "#2C2C2F" : "#F0F0F3" }]}>
-                  <Ionicons name="chevron-forward" size={14} color={sub} />
-                </View>
-              </TouchableOpacity>
+                </TouchableOpacity>
+              </>
             );
           }}
         />
@@ -128,6 +164,7 @@ const s = StyleSheet.create({
   header: { paddingHorizontal: 20, paddingBottom: 16, borderBottomWidth: StyleSheet.hairlineWidth },
   title: { fontSize: 28, fontWeight: "800", letterSpacing: -0.5 },
   subtitle: { fontSize: 13, marginTop: 2 },
+  sectionTitle: { fontSize: 12, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.6, opacity: 0.75 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32 },
   emptyTitle: { fontSize: 18, fontWeight: "700", marginTop: 16, textAlign: "center" },
   emptySub: { fontSize: 14, marginTop: 8, textAlign: "center", lineHeight: 20 },
@@ -146,6 +183,8 @@ const s = StyleSheet.create({
   chatName: { fontSize: 15, fontWeight: "700" },
   catChip: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
   catChipText: { fontSize: 11, fontWeight: "600", textTransform: "capitalize" },
+  readOnlyPill: { backgroundColor: "#FF453A18", paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
+  readOnlyPillText: { fontSize: 10, fontWeight: "700", color: "#FF453A" },
   meta: { fontSize: 12 },
   arrow: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },
 });

@@ -35,8 +35,9 @@ router.get('/groups', authMiddleware, async (req, res) => {
     const rows = await db.rows(
       `SELECT gc.* FROM group_chats gc
        INNER JOIN group_chat_members gcm ON gcm.group_chat_id = gc.id AND gcm.user_id = $1
-       WHERE gc.expires_at > NOW()
-       ORDER BY gc.expires_at ASC`,
+       ORDER BY
+         CASE WHEN gc.expires_at > NOW() THEN 0 ELSE 1 END ASC,
+         gc.event_at DESC`,
       [req.userId]
     );
     return res.json(rows.map(groupRowToJson));

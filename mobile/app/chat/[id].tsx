@@ -60,7 +60,7 @@ export default function ChatScreen() {
     };
     const handleExpired = () => {
       setExpired(true);
-      alert.show("Chat ended", "This event has ended and the group has been closed.", undefined, "info");
+      alert.show("Chat ended", "This event has ended. The chat is now read-only.", undefined, "info");
     };
 
     loadMessages().then((canJoin) => {
@@ -236,7 +236,7 @@ export default function ChatScreen() {
       ) : (
         <View style={[s.expiredBar, { backgroundColor: "#FF453A10", borderTopColor: "#FF453A30", paddingBottom: safeBottom }]}>
           <Ionicons name="lock-closed-outline" size={14} color="#FF453A" />
-          <Text style={s.expiredBarText}>This group chat has ended</Text>
+          <Text style={s.expiredBarText}>Chat ended · read-only (replies disabled)</Text>
         </View>
       )}
     </KeyboardAvoidingView>
