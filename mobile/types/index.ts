@@ -51,6 +51,7 @@ export interface GroupChat {
   category?: string | null;
   event_at?: string | null;
   expires_at: string;
+  unread_count?: number;
 }
 
 export interface Message {
@@ -58,5 +59,14 @@ export interface Message {
   user_id: string;
   user_name?: string | null;
   body: string;
+  created_at: string;
+}
+
+export interface AppNotification {
+  id: string;
+  title: string;
+  body: string;
+  data?: Record<string, unknown>;
+  read_at?: string | null;
   created_at: string;
 }

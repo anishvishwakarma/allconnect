@@ -60,6 +60,11 @@ router.post('/request', authMiddleware, rateLimitRequestWrites, async (req, res)
       return res.status(400).json({ error: 'This post is no longer accepting joins' });
     }
 
+    const requesterRow = await db.row('SELECT name FROM users WHERE id = $1', [req.userId]);
+    const requesterName = (requesterRow?.name || 'Someone').trim() || 'Someone';
+    const postTitle = (post.title || 'Your event').trim() || 'Your event';
+    const titleShort = postTitle.length > 40 ? `${postTitle.slice(0, 40)}…` : postTitle;
+
     if (post.privacy_type === 'approval') {
       const client = await db.pool.connect();
       try {
@@ -77,6 +82,11 @@ router.post('/request', authMiddleware, rateLimitRequestWrites, async (req, res)
             [uuidv4(), postId, req.userId]
           );
           await client.query('COMMIT');
+          sendPushToUser(post.host_id, {
+            title: `Wants to join · ${titleShort}`,
+            body: `${requesterName} asked to join. Open the post to approve or decline.`,
+            data: { type: 'join_request', postId, postTitle, requesterName },
+          }).catch((e) => console.error('Push on request create:', e));
           return res.json({ success: true, status: 'pending' });
         }
 
@@ -86,6 +96,11 @@ router.post('/request', authMiddleware, rateLimitRequestWrites, async (req, res)
             [existing.id]
           );
           await client.query('COMMIT');
+          sendPushToUser(post.host_id, {
+            title: `Wants to join · ${titleShort}`,
+            body: `${requesterName} asked to join. Open the post to approve or decline.`,
+            data: { type: 'join_request', postId, postTitle, requesterName },
+          }).catch((e) => console.error('Push on request resend:', e));
           return res.json({ success: true, status: 'pending' });
         }
 
@@ -273,10 +288,17 @@ router.post('/approve', authMiddleware, rateLimitRequestWrites, async (req, res)
       }
 
       await client.query('COMMIT');
+      const approvedTitle = (post.title || 'Event').trim() || 'Event';
+      const approvedShort = approvedTitle.length > 40 ? `${approvedTitle.slice(0, 40)}…` : approvedTitle;
       sendPushToUser(userId, {
-        title: 'Request approved',
-        body: 'Your join request was approved! Open the post to join the group chat.',
-        data: { type: 'join_approved', postId },
+        title: `You're in · ${approvedShort}`,
+        body: 'Your join request was approved. Open the group chat to say hi.',
+        data: {
+          type: 'join_approved',
+          postId,
+          postTitle: post.title,
+          groupId: gc?.id ? String(gc.id) : '',
+        },
       }).catch((e) => console.error('Push on approve:', e));
       return res.json({ success: true, group_chat_id: gc?.id || null });
     } catch (err) {

@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useFocusEffect } from "expo-router";
 import {
   View, Text, FlatList, TouchableOpacity,
   StyleSheet, ActivityIndicator, RefreshControl,
@@ -9,6 +10,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getBottomInset, CATEGORY_COLORS } from "../../constants/config";
 import { useAuthStore } from "../../store/auth";
 import { chatsApi } from "../../services/api";
+import { useBadgeStore } from "../../store/badges";
+import type { GroupChat } from "../../types";
 import { useAppTheme } from "../../context/ThemeContext";
 
 const PRIMARY = "#E8751A";
@@ -17,7 +20,7 @@ export default function ChatsScreen() {
   const insets = useSafeAreaInsets();
   const token = useAuthStore((s) => s.token);
   const { isDark } = useAppTheme();
-  const [groups, setGroups] = useState<any[]>([]);
+  const [groups, setGroups] = useState<GroupChat[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -35,6 +38,12 @@ export default function ChatsScreen() {
 
   useEffect(() => { if (token) load(); else setLoading(false); }, [token]);
 
+  useFocusEffect(
+    useCallback(() => {
+      if (token) void useBadgeStore.getState().refresh();
+    }, [token])
+  );
+
   function timeRemaining(expiresAt: string) {
     const diff = new Date(expiresAt).getTime() - Date.now();
     if (diff <= 0) return "Expired";
@@ -49,11 +58,11 @@ export default function ChatsScreen() {
   }
 
   const activeGroups = groups.filter((item) => {
-    const expiresAt = item.expires_at ?? item.expiresAt;
+    const expiresAt = item.expires_at;
     return expiresAt ? !isExpired(expiresAt) : true;
   });
   const archivedGroups = groups.filter((item) => {
-    const expiresAt = item.expires_at ?? item.expiresAt;
+    const expiresAt = item.expires_at;
     return expiresAt ? isExpired(expiresAt) : false;
   });
 
@@ -105,8 +114,9 @@ export default function ChatsScreen() {
             ) : null
           }
           renderItem={({ item, index }) => {
-            const catColor = CATEGORY_COLORS[item.category] || PRIMARY;
-            const expiresAt = item.expires_at ?? item.expiresAt;
+            const catKey = item.category || "other";
+            const catColor = CATEGORY_COLORS[catKey] || PRIMARY;
+            const expiresAt = item.expires_at;
             const expired = expiresAt ? isExpired(expiresAt) : false;
             const remaining = expiresAt ? timeRemaining(expiresAt) : "";
             const isExpiringSoon = expiresAt ? (new Date(expiresAt).getTime() - Date.now() < 3600000 && !expired) : false;
@@ -126,13 +136,13 @@ export default function ChatsScreen() {
                     <Ionicons name="people" size={22} color={catColor} />
                   </View>
                   <View style={{ flex: 1, marginLeft: 14 }}>
-                    <Text style={[s.chatName, { color: text }]} numberOfLines={1}>{item.title || item.name}</Text>
+                    <Text style={[s.chatName, { color: text }]} numberOfLines={1}>{item.title || "Group chat"}</Text>
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 }}>
                       <View style={[s.catChip, { backgroundColor: catColor + "18" }]}>
                         <Text style={[s.catChipText, { color: catColor }]}>{item.category}</Text>
                       </View>
                       <Text style={[s.meta, { color: sub }]}>
-                        {(item.event_at ?? item.eventAt) ? new Date(item.event_at ?? item.eventAt).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : ""}
+                        {item.event_at ? new Date(item.event_at).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : ""}
                       </Text>
                       {expired && (
                         <View style={s.readOnlyPill}>
@@ -179,7 +189,20 @@ const s = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
   },
-  avatar: { width: 48, height: 48, borderRadius: 24, alignItems: "center", justifyContent: "center" },
+  avatar: { width: 48, height: 48, borderRadius: 24, alignItems: "center", justifyContent: "center", position: "relative" },
+  threadBadge: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 5,
+    backgroundColor: PRIMARY,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  threadBadgeText: { color: "#fff", fontSize: 10, fontWeight: "800" },
   chatName: { fontSize: 15, fontWeight: "700" },
   catChip: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
   catChipText: { fontSize: 11, fontWeight: "600", textTransform: "capitalize" },

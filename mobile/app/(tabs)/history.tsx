@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useFocusEffect } from "expo-router";
 import {
   View, Text, FlatList, TouchableOpacity,
   StyleSheet, ActivityIndicator, RefreshControl,
@@ -8,6 +9,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getBottomInset, CATEGORY_COLORS } from "../../constants/config";
 import { useAuthStore } from "../../store/auth";
+import { useBadgeStore } from "../../store/badges";
 import { postsApi } from "../../services/api";
 import { useAppTheme } from "../../context/ThemeContext";
 
@@ -45,6 +47,12 @@ export default function HistoryScreen() {
   }
 
   useEffect(() => { if (token) load(); else setLoading(false); }, [token]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (token) void useBadgeStore.getState().refresh();
+    }, [token])
+  );
 
   if (!token) {
     return (

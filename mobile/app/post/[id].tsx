@@ -7,6 +7,7 @@ import { useLocalSearchParams, router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { postsApi, requestsApi, chatsApi } from "../../services/api";
 import { useAuthStore } from "../../store/auth";
+import { useBadgeStore } from "../../store/badges";
 import { CATEGORY_COLORS } from "../../constants/config";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getBottomInset } from "../../constants/config";
@@ -85,7 +86,7 @@ export default function PostDetailScreen() {
         alert.show("Request sent", "The host will review your request soon.", undefined, "success");
       }
     } catch (err: any) { alert.show("Something went wrong", "Could not send your request. Please try again.", undefined, "error"); }
-    finally { setActionId(null); }
+    finally { setActionId(null); void useBadgeStore.getState().refresh(); }
   }
 
   async function handleAction(reqUserId: string, action: "approve" | "reject") {
@@ -96,7 +97,7 @@ export default function PostDetailScreen() {
       setRequests((prev) => prev.map((r) => (r.user_id === reqUserId ? { ...r, status: action === "approve" ? "approved" : "rejected" } : r)));
       if (action === "approve") await load();
     } catch (err: any) { alert.show("Something went wrong", "Action failed. Please try again.", undefined, "error"); }
-    finally { setActionId(null); }
+    finally { setActionId(null); void useBadgeStore.getState().refresh(); }
   }
 
   if (loading) {

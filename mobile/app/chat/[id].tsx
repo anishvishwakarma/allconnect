@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import { useFocusEffect } from "expo-router";
 import {
   View, Text, FlatList, TextInput, TouchableOpacity,
   KeyboardAvoidingView, Platform, ActivityIndicator,
@@ -13,6 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getBottomInset } from "../../constants/config";
 import { useAppTheme } from "../../context/ThemeContext";
 import { useAlert } from "../../context/AlertContext";
+import { useBadgeStore } from "../../store/badges";
 
 const PRIMARY = "#E8751A";
 
@@ -81,6 +83,14 @@ export default function ChatScreen() {
       socket.off("chat:expired", handleExpired);
     };
   }, [id, token]);
+
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        void useBadgeStore.getState().refresh();
+      };
+    }, [])
+  );
 
   async function loadMessages(): Promise<boolean> {
     try {
@@ -167,7 +177,12 @@ export default function ChatScreen() {
   const safeBottom = getBottomInset(insets.bottom);
 
   return (
-    <KeyboardAvoidingView behavior="padding" style={{ flex: 1, backgroundColor: bg }}>
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: bg }}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      enabled={Platform.OS === "ios"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? insets.top + 56 : 0}
+    >
       {/* Header */}
       <View style={[s.header, { backgroundColor: surface, borderBottomColor: border, paddingTop: insets.top + 12 }]}>
         <TouchableOpacity onPress={() => router.back()} style={[s.backBtn, { backgroundColor: isDark ? "#252528" : "#F0F0F3" }]}>

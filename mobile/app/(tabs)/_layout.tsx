@@ -1,17 +1,44 @@
+import { useEffect } from "react";
 import { Tabs } from "expo-router";
 import { View, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getBottomInset } from "../../constants/config";
 import { useAuthStore } from "../../store/auth";
+import { useBadgeStore } from "../../store/badges";
+import { getSocket } from "../../services/socket";
 import { useAppTheme } from "../../context/ThemeContext";
 
 const PRIMARY = "#E8751A";
 
+function tabBadge(n: number): string | undefined {
+  if (n <= 0) return undefined;
+  return n > 99 ? "99+" : String(n);
+}
+
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
   const hasHydrated = useAuthStore((s) => s.hasHydrated);
+  const token = useAuthStore((s) => s.token);
+  const chatUnread = useBadgeStore((s) => s.chat_unread);
+  const historyPending = useBadgeStore((s) => s.history_pending_requests);
   const { isDark } = useAppTheme();
+
+  useEffect(() => {
+    if (!token) {
+      useBadgeStore.getState().reset();
+      return;
+    }
+    void useBadgeStore.getState().refresh();
+    const socket = getSocket();
+    const bump = () => void useBadgeStore.getState().refresh();
+    socket.on("new_message", bump);
+    const interval = setInterval(() => void useBadgeStore.getState().refresh(), 45000);
+    return () => {
+      socket.off("new_message", bump);
+      clearInterval(interval);
+    };
+  }, [token]);
 
   if (!hasHydrated) return null;
   const bg = isDark ? "#0C0C0F" : "#FFFFFF";
@@ -40,6 +67,12 @@ export default function TabsLayout() {
           letterSpacing: 0.2,
           marginTop: 2,
         },
+        tabBarBadgeStyle: {
+          backgroundColor: PRIMARY,
+          color: "#fff",
+          fontSize: 10,
+          fontWeight: "700",
+        },
       }}
     >
       <Tabs.Screen
@@ -55,6 +88,7 @@ export default function TabsLayout() {
         name="history"
         options={{
           title: "History",
+          tabBarBadge: tabBadge(historyPending),
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "time" : "time-outline"} size={22} color={color} />
           ),
@@ -83,9 +117,16 @@ export default function TabsLayout() {
         name="chats"
         options={{
           title: "Chats",
+          tabBarBadge: tabBadge(chatUnread),
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "chatbubbles" : "chatbubbles-outline"} size={22} color={color} />
           ),
+        }}
+      />
+      <Tabs.Screen
+        name="notifications"
+        options={{
+          href: null,
         }}
       />
       <Tabs.Screen

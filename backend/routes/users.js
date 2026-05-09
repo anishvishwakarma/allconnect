@@ -9,6 +9,7 @@ const {
   rateLimitUserProfilePatch,
   rateLimitAccountDelete,
 } = require('../middleware/rateLimiter');
+const { ensureNotificationsTable } = require('../services/notifications');
 
 const router = express.Router();
 
@@ -47,6 +48,53 @@ function isExpoPushToken(token) {
 }
 
 router.use(authMiddleware);
+
+// GET /api/users/badges — tab counts (chats unread, history pending approvals, notification inbox)
+router.get('/badges', async (req, res) => {
+  try {
+    await db.query(
+      'ALTER TABLE group_chat_members ADD COLUMN IF NOT EXISTS last_read_at TIMESTAMPTZ'
+    );
+    await ensureNotificationsTable();
+    const userId = req.userId;
+    const chatRow = await db.row(
+      `SELECT COALESCE(SUM(cnt), 0)::int AS n
+       FROM (
+         SELECT COUNT(*)::int AS cnt
+         FROM group_chat_members gcm
+         INNER JOIN messages m ON m.group_chat_id = gcm.group_chat_id AND m.user_id <> $1
+         WHERE gcm.user_id = $1
+           AND (gcm.last_read_at IS NULL OR m.created_at > gcm.last_read_at)
+         GROUP BY gcm.group_chat_id
+       ) t`,
+      [userId]
+    );
+    const pendingRow = await db.row(
+      `SELECT COUNT(*)::int AS n
+       FROM join_requests jr
+       INNER JOIN posts p ON p.id = jr.post_id
+       WHERE p.host_id = $1
+         AND jr.status = 'pending'
+         AND p.privacy_type = 'approval'
+         AND p.status IN ('open', 'full')`,
+      [userId]
+    );
+    const notifRow = await db.row(
+      `SELECT COUNT(*)::int AS n
+       FROM notifications
+       WHERE user_id = $1 AND read_at IS NULL`,
+      [userId]
+    );
+    return res.json({
+      chat_unread: chatRow?.n ?? 0,
+      history_pending_requests: pendingRow?.n ?? 0,
+      notifications_unread: notifRow?.n ?? 0,
+    });
+  } catch (err) {
+    console.error('users/badges', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
 
 // GET /api/users/me
 router.get('/me', async (req, res) => {

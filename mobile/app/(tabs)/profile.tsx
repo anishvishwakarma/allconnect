@@ -7,6 +7,7 @@ import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { usersApi } from "../../services/api";
 import { useAuthStore } from "../../store/auth";
+import { useBadgeStore } from "../../store/badges";
 import { disconnectSocket } from "../../services/socket";
 import { getInitials } from "../../utils/profile";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -25,6 +26,7 @@ export default function ProfileScreen() {
   const [email, setEmail] = useState(user?.email || "");
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const notificationsUnread = useBadgeStore((s) => s.notifications_unread);
 
   const bg = isDark ? "#0C0C0F" : "#F5F5F7";
   const surface = isDark ? "#1A1A1F" : "#FFFFFF";
@@ -35,6 +37,13 @@ export default function ProfileScreen() {
   useEffect(() => {
     if (!token) return;
     usersApi.me().then((u) => { updateUser(u); setName(u.name || ""); setEmail(u.email || ""); }).catch(() => {});
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) return;
+    void useBadgeStore.getState().refresh();
+    const id = setInterval(() => void useBadgeStore.getState().refresh(), 30000);
+    return () => clearInterval(id);
   }, [token]);
 
   useEffect(() => {
@@ -183,6 +192,22 @@ export default function ProfileScreen() {
             <Text style={[s.menuLabel, { color: text }]}>Settings</Text>
             <Ionicons name="chevron-forward" size={18} color={sub} />
           </TouchableOpacity>
+          <View style={[s.separator, { backgroundColor: border }]} />
+          <TouchableOpacity
+            onPress={() => router.push("/(tabs)/notifications")}
+            style={s.menuRow}
+          >
+            <View style={[s.fieldIcon, { backgroundColor: PRIMARY + "18" }]}>
+              <Ionicons name="notifications-outline" size={18} color={PRIMARY} />
+            </View>
+            <Text style={[s.menuLabel, { color: text }]}>Notifications</Text>
+            {notificationsUnread > 0 ? (
+              <View style={s.unreadPill}>
+                <Text style={s.unreadPillText}>{notificationsUnread > 99 ? "99+" : notificationsUnread}</Text>
+              </View>
+            ) : null}
+            <Ionicons name="chevron-forward" size={18} color={sub} />
+          </TouchableOpacity>
         </View>
 
         {/* Plan card */}
@@ -265,4 +290,6 @@ const s = StyleSheet.create({
   menuLabel: { flex: 1, fontSize: 16, fontWeight: "500" },
   logoutBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, padding: 16, borderRadius: 18, borderWidth: 1 },
   logoutText: { color: "#FF453A", fontWeight: "700", fontSize: 15 },
+  unreadPill: { backgroundColor: "#E8751A", minWidth: 22, height: 22, borderRadius: 11, paddingHorizontal: 6, alignItems: "center", justifyContent: "center", marginRight: 8 },
+  unreadPillText: { color: "#fff", fontSize: 11, fontWeight: "700" },
 });

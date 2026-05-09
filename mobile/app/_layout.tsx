@@ -23,7 +23,10 @@ function RootStack() {
       const postId = typeof data?.postId === "string" ? data.postId : "";
       if (type === "chat_message" && groupId) {
         router.push(`/chat/${groupId}`);
-      } else if (type === "join_approved" && postId) {
+      } else if (type === "join_approved") {
+        if (groupId) router.push(`/chat/${groupId}`);
+        else if (postId) router.push(`/post/${postId}`);
+      } else if (type === "join_request" && postId) {
         router.push(`/post/${postId}`);
       }
     }

@@ -6,6 +6,15 @@ const { rateLimitChatMessage } = require('../middleware/rateLimiter');
 
 const router = express.Router();
 
+let ensuredLastReadColumn = false;
+async function ensureLastReadColumn() {
+  if (ensuredLastReadColumn) return;
+  await db.query(
+    'ALTER TABLE group_chat_members ADD COLUMN IF NOT EXISTS last_read_at TIMESTAMPTZ'
+  );
+  ensuredLastReadColumn = true;
+}
+
 function groupRowToJson(r) {
   if (!r) return null;
   return {
@@ -15,6 +24,7 @@ function groupRowToJson(r) {
     category: r.category,
     event_at: r.event_at,
     expires_at: r.expires_at,
+    unread_count: r.unread_count != null ? Number(r.unread_count) : 0,
   };
 }
 
@@ -32,8 +42,16 @@ function messageRowToJson(r) {
 // GET /api/chats/groups
 router.get('/groups', authMiddleware, async (req, res) => {
   try {
+    await ensureLastReadColumn();
     const rows = await db.rows(
-      `SELECT gc.* FROM group_chats gc
+      `SELECT gc.*,
+        (
+          SELECT COUNT(*)::int FROM messages m
+          WHERE m.group_chat_id = gc.id
+            AND m.user_id <> $1
+            AND (gcm.last_read_at IS NULL OR m.created_at > gcm.last_read_at)
+        ) AS unread_count
+       FROM group_chats gc
        INNER JOIN group_chat_members gcm ON gcm.group_chat_id = gc.id AND gcm.user_id = $1
        ORDER BY
          CASE WHEN gc.expires_at > NOW() THEN 0 ELSE 1 END ASC,
@@ -50,6 +68,7 @@ router.get('/groups', authMiddleware, async (req, res) => {
 // GET /api/chats/groups/:groupId/messages (allowed when chat expired — read-only)
 router.get('/groups/:groupId/messages', authMiddleware, async (req, res) => {
   try {
+    await ensureLastReadColumn();
     const groupId = req.params.groupId;
     const member = await db.row(
       'SELECT 1 FROM group_chat_members WHERE group_chat_id = $1 AND user_id = $2',
@@ -68,6 +87,10 @@ router.get('/groups/:groupId/messages', authMiddleware, async (req, res) => {
       [groupId]
     );
     const expired = new Date(group.expires_at) < new Date();
+    await db.query(
+      'UPDATE group_chat_members SET last_read_at = NOW() WHERE group_chat_id = $1 AND user_id = $2',
+      [groupId, req.userId]
+    );
     return res.json({ messages: rows.map(messageRowToJson), expired });
   } catch (err) {
     console.error('chats/messages', err);

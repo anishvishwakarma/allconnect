@@ -1,7 +1,7 @@
 import { API_URL } from '../constants/config';
 import { disconnectSocket } from './socket';
 import { useAuthStore } from '../store/auth';
-import type { Post, JoinRequest, GroupChat, Message, User } from '../types';
+import type { Post, JoinRequest, GroupChat, Message, User, AppNotification } from '../types';
 
 const DEFAULT_TIMEOUT_MS = 15000;
 const AUTH_TIMEOUT_MS = 45000; // Render cold start can take 30–60s
@@ -127,6 +127,12 @@ export const authApi = {
 
 // ── Users ────────────────────────────────────────────────
 export const usersApi = {
+  badges: () =>
+    request<{
+      chat_unread: number;
+      history_pending_requests: number;
+      notifications_unread: number;
+    }>('/api/users/badges'),
   me: () => request<User>('/api/users/me'),
   update: (data: { name?: string; avatar_uri?: string }) =>
     request<User>('/api/users/me', { method: 'PATCH', body: JSON.stringify(data) }),
@@ -217,6 +223,22 @@ export const chatsApi = {
     request<Message>(`/api/chats/groups/${groupId}/messages`, {
       method: 'POST',
       body: JSON.stringify({ body }),
+    }),
+};
+
+// ── Notifications ──────────────────────────────────────────
+export const notificationsApi = {
+  list: (limit = 50) =>
+    request<{ items: AppNotification[]; unread_count: number }>(`/api/notifications?limit=${encodeURIComponent(String(limit))}`),
+  markRead: (id: string) =>
+    request<AppNotification>(`/api/notifications/${id}/read`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
+  markAllRead: () =>
+    request<{ success: boolean }>(`/api/notifications/read-all`, {
+      method: 'POST',
+      body: JSON.stringify({}),
     }),
 };
 

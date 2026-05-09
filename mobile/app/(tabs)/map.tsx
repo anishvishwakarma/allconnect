@@ -275,6 +275,18 @@ export default function MapScreen() {
   const freshPinsClearRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [freshPinIds, setFreshPinIds] = useState<Set<string>>(new Set());
 
+  function regionChangedSignificantly(
+    a: { latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number },
+    b: { latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number }
+  ) {
+    return (
+      Math.abs(a.latitude - b.latitude) > 0.00001 ||
+      Math.abs(a.longitude - b.longitude) > 0.00001 ||
+      Math.abs(a.latitudeDelta - b.latitudeDelta) > 0.00001 ||
+      Math.abs(a.longitudeDelta - b.longitudeDelta) > 0.00001
+    );
+  }
+
   const fetchPins = useCallback(async () => {
     setLoading(true);
     const { latitude, longitude } = regionRef.current;
@@ -339,11 +351,13 @@ export default function MapScreen() {
     };
   }, []);
 
-  function scheduleFetchForRegion(nextRegion: typeof region) {
-    setRegion(nextRegion);
+  function scheduleFetchForRegion(nextRegion: typeof region, syncState = false) {
+    if (syncState && regionChangedSignificantly(regionRef.current, nextRegion)) {
+      setRegion(nextRegion);
+    }
+    regionRef.current = nextRegion;
     if (regionFetchTimeoutRef.current) clearTimeout(regionFetchTimeoutRef.current);
     regionFetchTimeoutRef.current = setTimeout(() => {
-      regionRef.current = nextRegion;
       fetchPins();
     }, 350);
   }
@@ -367,6 +381,8 @@ export default function MapScreen() {
       });
       const { latitude, longitude } = loc.coords;
       const nextRegion = { ...regionRef.current, latitude, longitude };
+      setRegion(nextRegion);
+      mapRef.current?.animateToRegion(nextRegion, 350);
       scheduleFetchForRegion(nextRegion);
       setUserLocation({ latitude, longitude });
       setLocationGranted(true);
@@ -496,9 +512,9 @@ export default function MapScreen() {
         provider={PROVIDER_GOOGLE}
         style={[StyleSheet.absoluteFillObject, { minHeight: SCREEN_H }]}
         mapPadding={{ bottom: TAB_BAR_BASE_HEIGHT + getBottomInset(insets.bottom), top: 0, left: 0, right: 0 }}
-        region={region}
+        initialRegion={region}
         mapType="standard"
-        onRegionChangeComplete={scheduleFetchForRegion}
+        onRegionChangeComplete={(r) => scheduleFetchForRegion(r, false)}
         onMapReady={() => { setMapReady(true); setMapLoadError(false); }}
         showsUserLocation={locationGranted}
         showsMyLocationButton={false}

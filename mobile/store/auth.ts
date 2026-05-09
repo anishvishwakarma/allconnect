@@ -39,6 +39,10 @@ export const useAuthStore = create<AuthState>()(
           };
           void signOutFirebase?.();
         } catch {}
+        try {
+          const { useBadgeStore } = require('./badges') as { useBadgeStore: { getState: () => { reset: () => void } } };
+          useBadgeStore.getState().reset();
+        } catch {}
         set({ token: null, user: null });
       },
     }),

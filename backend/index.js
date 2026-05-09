@@ -13,6 +13,8 @@ const postsRoutes = require('./routes/posts');
 const requestsRoutes = require('./routes/requests');
 const chatsRoutes = require('./routes/chats');
 const placesRoutes = require('./routes/places');
+const notificationsRoutes = require('./routes/notifications');
+const { ensureNotificationsTable } = require('./services/notifications');
 
 const app = express();
 const server = http.createServer(app);
@@ -57,6 +59,7 @@ app.use('/api/posts/:postId', requestsRoutes); // must be before /api/posts so /
 app.use('/api/posts', postsRoutes);
 app.use('/api/chats', chatsRoutes);
 app.use('/api/places', placesRoutes);
+app.use('/api/notifications', notificationsRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });
@@ -138,11 +141,28 @@ app.on('chat:new_message', ({ groupId, message }) => {
       );
       const userIds = (members || []).map((m) => m.user_id);
       if (!userIds.length) return;
-      const body = (message.body || '').slice(0, 80);
+      const rawBody = String(message.body || '').trim();
+      const preview =
+        rawBody.length > 80 ? `${rawBody.slice(0, 80)}…` : rawBody;
+      const groupMeta = await db.row(
+        'SELECT title, post_id FROM group_chats WHERE id = $1',
+        [groupId]
+      );
+      const chatTitle = String(groupMeta?.title || 'Group chat').trim() || 'Group chat';
+      const postId = groupMeta?.post_id ? String(groupMeta.post_id) : '';
+      const titleLine =
+        chatTitle.length > 36 ? `${chatTitle.slice(0, 36)}…` : chatTitle;
+      const senderName = String(message?.user_name || 'Someone').trim() || 'Someone';
       await sendPushToUsers(userIds, {
-        title: 'New message',
-        body: body ? `${body}${body.length >= 80 ? '…' : ''}` : 'You have a new message',
-        data: { type: 'chat_message', groupId },
+        title: `Message · ${titleLine}`,
+        body: preview ? `${senderName}: ${preview}` : `${senderName} sent a message`,
+        data: {
+          type: 'chat_message',
+          groupId,
+          postId,
+          chatTitle,
+          senderName,
+        },
       });
     } catch (err) {
       console.error('chat:new_message handler', err);
@@ -170,4 +190,5 @@ server.listen(PORT, () => {
   if (!process.env.DATABASE_URL) console.warn('DATABASE_URL not set — set it in .env');
   const { isConfigured } = require('./services/firebase');
   if (!isConfigured()) console.warn('Firebase not configured — set FIREBASE_SERVICE_ACCOUNT_JSON or FIREBASE_SERVICE_ACCOUNT_PATH. Login will return 503.');
+  ensureNotificationsTable().catch((err) => console.error('Failed to ensure notifications table:', err?.message || err));
 });
