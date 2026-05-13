@@ -98,6 +98,19 @@ const ms = StyleSheet.create({
     borderLeftColor: "transparent",
     borderRightColor: "transparent",
   },
+  /** Long-press “create here” — distinct from category pins (e.g. green activity). */
+  pinStackDraft: { width: 62, height: 72 },
+  pinBubbleDraft: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    borderWidth: 4,
+    shadowOpacity: 0.38,
+    shadowRadius: 10,
+    elevation: 14,
+  },
+  pinBubbleInnerDraft: { width: 40, height: 40, borderRadius: 20 },
+  pulseRingDraft: { width: 52, height: 52, borderRadius: 26, top: 0 },
 });
 
 function MapPinBubble({
@@ -105,11 +118,14 @@ function MapPinBubble({
   icon,
   selected,
   pulse,
+  draft = false,
 }: {
   color: string;
   icon: keyof typeof Ionicons.glyphMap;
   selected: boolean;
   pulse: boolean;
+  /** Long-press draft pin: stronger silhouette + pulse so it never reads like a category marker. */
+  draft?: boolean;
 }) {
   const drop = useRef(new Animated.Value(0)).current;
   const fade = useRef(new Animated.Value(0)).current;
@@ -131,8 +147,10 @@ function MapPinBubble({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- entrance only on mount / marker remount (keyed by id)
   }, []);
 
+  const showPulse = draft || pulse;
+
   useEffect(() => {
-    if (!pulse) return;
+    if (!showPulse) return;
     ring.setValue(1);
     const loop = Animated.loop(
       Animated.sequence([
@@ -149,14 +167,15 @@ function MapPinBubble({
       loop.stop();
       clearTimeout(stop);
     };
-  }, [pulse, ring]);
+  }, [showPulse, ring]);
 
-  const scale = selected ? 1.14 : 1;
+  const scale = draft ? 1.06 : selected ? 1.14 : 1;
 
   return (
     <Animated.View
       style={[
         ms.pinStack,
+        draft && ms.pinStackDraft,
         {
           opacity: fade,
           transform: [{ translateY: drop }, { scale }],
@@ -164,10 +183,11 @@ function MapPinBubble({
       ]}
       collapsable={false}
     >
-      {pulse ? (
+      {showPulse ? (
         <Animated.View
           style={[
             ms.pulseRing,
+            draft && ms.pulseRingDraft,
             {
               borderColor: color,
               transform: [{ scale: ring }],
@@ -180,9 +200,28 @@ function MapPinBubble({
         />
       ) : null}
       <View style={ms.pinUpper}>
-        <View style={[ms.pinBubble, { borderColor: color, shadowColor: "#000000" }]}>
-          <View style={[ms.pinBubbleInner, { backgroundColor: color }]}>
-            <Ionicons name={icon} size={21} color="#FFFFFF" />
+        <View
+          style={[
+            ms.pinBubble,
+            draft && ms.pinBubbleDraft,
+            {
+              borderColor: draft ? "#FFFFFF" : color,
+              shadowColor: draft ? PRIMARY : "#000000",
+            },
+          ]}
+        >
+          <View
+            style={[
+              ms.pinBubbleInner,
+              draft && ms.pinBubbleInnerDraft,
+              { backgroundColor: color },
+            ]}
+          >
+            <Ionicons
+              name={draft ? "add-circle" : icon}
+              size={draft ? 24 : 21}
+              color="#FFFFFF"
+            />
           </View>
         </View>
         <View style={[ms.pinTail, { borderTopColor: color }]} />
@@ -230,12 +269,17 @@ function DraftMapMarker({
 }) {
   const [tracksViewChanges, setTracksViewChanges] = useState(true);
   useEffect(() => {
-    const t = setTimeout(() => setTracksViewChanges(false), 1200);
+    const t = setTimeout(() => setTracksViewChanges(false), 3200);
     return () => clearTimeout(t);
   }, []);
   return (
-    <AnyMarker coordinate={coordinate} anchor={{ x: 0.5, y: 1 }} tracksViewChanges={tracksViewChanges}>
-      <MapPinBubble color={PRIMARY} icon="add" selected={false} pulse={false} />
+    <AnyMarker
+      coordinate={coordinate}
+      anchor={{ x: 0.5, y: 1 }}
+      tracksViewChanges={tracksViewChanges}
+      zIndex={2000}
+    >
+      <MapPinBubble color={PRIMARY} icon="add" selected={false} pulse={false} draft />
     </AnyMarker>
   );
 }
