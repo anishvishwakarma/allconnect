@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  ActivityIndicator, Dimensions, TextInput, Animated,
+  ActivityIndicator, Dimensions, TextInput,
+  Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import MapView, { Marker, PROVIDER_GOOGLE, MapMarkerProps } from "react-native-maps";
@@ -41,86 +42,144 @@ function getDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
+/** White icons on saturated pin fill; dark on yellow “selling” for contrast. */
+function iconOnCategoryFill(hex: string): string {
+  const h = (hex || "").trim().toUpperCase();
+  if (h === "#FFD60A") return "#1C1C1E";
+  return "#FFFFFF";
+}
+
+/** Distinct Ionicons (bundled free with Expo) — matches create-post category keys + `CATEGORY_COLORS`. */
 const CATEGORY_MARKER_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
-  activity: "bicycle",
+  activity: "barbell-outline",
   need: "heart",
-  selling: "pricetag",
-  meetup: "people",
-  event: "calendar",
-  study: "school",
-  nightlife: "moon",
-  other: "location",
+  selling: "storefront-outline",
+  meetup: "people-circle-outline",
+  event: "calendar-outline",
+  study: "book-outline",
+  nightlife: "musical-notes-outline",
+  other: "navigate-circle-outline",
 };
 
+type MarkerGlyph = keyof typeof Ionicons.glyphMap;
+
+/** Long phrases / multi-word / length ≥5 use substring match; short tokens use whole-word match (avoids `eat` in `great`, `moving` in `removing`). */
+function titleMatchesHint(haystackLower: string, hint: string): boolean {
+  const h = hint.trim().toLowerCase();
+  if (!h) return false;
+  if (h.includes(" ") || h.length >= 5) return haystackLower.includes(h);
+  const esc = h.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`\\b${esc}\\b`, "i").test(haystackLower);
+}
+
+/**
+ * Optional icon from post title (Ionicons). First matching rule wins; else category default.
+ * Pin color still comes from the category tag (`CATEGORY_COLORS`) — only the glyph changes.
+ */
+const TITLE_HINT_RULES: ReadonlyArray<{ keys: readonly string[]; icon: MarkerGlyph }> = [
+  { keys: ["eating pizza", "pizza night", "pizzeria", "pizza"], icon: "pizza-outline" },
+  { keys: ["sushi", "sashimi", "ramen", "pho"], icon: "fish-outline" },
+  { keys: ["burger", "burrito", "taco", "fast food", "street food"], icon: "fast-food-outline" },
+  { keys: ["brunch", "breakfast", "coffee", "latte", "espresso", "cafe", "café"], icon: "cafe-outline" },
+  { keys: ["wine tasting", "winery", "wine"], icon: "wine-outline" },
+  { keys: ["brewery", "beer", "pub crawl", "pub night"], icon: "beer-outline" },
+  { keys: ["dinner", "lunch", "restaurant", "foodie", "food stall"], icon: "restaurant-outline" },
+  { keys: ["trekking", "day hike", "mountain hike", "hill walk", "hiking", "trail run"], icon: "map-outline" },
+  { keys: ["cycling", "bicycle", "biking", "bike ride", "bike trip"], icon: "bicycle-outline" },
+  { keys: ["moving"], icon: "move-outline" },
+  { keys: ["marathon", "running", "jogging", "jog"], icon: "footsteps-outline" },
+  { keys: ["swimming", "swim meet", "pool party", "swim"], icon: "water-outline" },
+  { keys: ["yoga", "pilates", "zumba", "dance class", "dancing", "dance"], icon: "body-outline" },
+  { keys: ["gym", "crossfit", "workout", "weights"], icon: "barbell-outline" },
+  { keys: ["clubbing", "nightclub", "afterparty", "rave", "dj night", "dj set", "open format", "dj"], icon: "musical-notes-outline" },
+  { keys: ["karaoke", "open mic", "mic night"], icon: "mic-outline" },
+  { keys: ["comedy night", "standup comedy", "comedian"], icon: "mic-outline" },
+  { keys: ["concert", "live band", "gig night", "orchestra"], icon: "musical-notes-outline" },
+  { keys: ["movie night", "cinema", "film screening", "movie"], icon: "film-outline" },
+  { keys: ["football", "soccer match", "soccer"], icon: "football-outline" },
+  { keys: ["basketball"], icon: "basketball-outline" },
+  { keys: ["tennis"], icon: "tennisball-outline" },
+  { keys: ["cricket", "badminton", "volleyball", "sports day"], icon: "trophy-outline" },
+  { keys: ["hackathon", "code night", "coding", "developer meet"], icon: "code-slash-outline" },
+  { keys: ["networking mixer", "networking"], icon: "people-outline" },
+  { keys: ["brainstorm", "conference", "town hall", "team meeting", "meeting"], icon: "chatbubbles-outline" },
+  { keys: ["standup", "scrum", "sprint planning"], icon: "briefcase-outline" },
+  { keys: ["study group", "exam prep", "homework", "lecture", "library"], icon: "book-outline" },
+  { keys: ["flight", "airport", "flying to"], icon: "airplane-outline" },
+  { keys: ["road trip", "drive to", "car pool", "carpool"], icon: "car-outline" },
+  { keys: ["photoshoot", "photography", "photo walk"], icon: "camera-outline" },
+  { keys: ["museum", "gallery", "art walk", "exhibition"], icon: "color-palette-outline" },
+  { keys: ["volunteer", "charity", "fundraiser"], icon: "heart-circle-outline" },
+  { keys: ["beach", "picnic", "sunset hang"], icon: "sunny-outline" },
+  { keys: ["birthday", "anniversary", "celebration"], icon: "gift-outline" },
+  { keys: ["board game", "boardgame", "game night"], icon: "dice-outline" },
+  { keys: ["golf"], icon: "golf-outline" },
+  { keys: ["party", "house party", "get-together", "get together"], icon: "musical-notes-outline" },
+];
+
+function resolveMarkerIconFromTitle(title: unknown, categoryKey: string | undefined): MarkerGlyph {
+  const fallback = CATEGORY_MARKER_ICONS[categoryKey ?? ""] ?? "location";
+  if (typeof title !== "string" || !title.trim()) return fallback;
+  const hay = title.toLowerCase();
+  for (const rule of TITLE_HINT_RULES) {
+    for (const key of rule.keys) {
+      if (titleMatchesHint(hay, key)) return rule.icon;
+    }
+  }
+  return fallback;
+}
+
+/**
+ * Static map pin — no Animated/transform/shadow/triangle tails inside Marker.
+ * Those break react-native-maps bitmap snapshots on Android (green arcs / missing icons).
+ */
+const PIN_W = 44;
+const PIN_HEAD = 44;
+
 const ms = StyleSheet.create({
-  pinStack: {
+  pinRoot: {
+    width: PIN_W,
+    height: 56,
     alignItems: "center",
-    justifyContent: "flex-end",
-    width: 64,
-    height: 78,
-  },
-  pulseRing: {
-    position: "absolute",
-    top: 0,
-    width: 54,
-    height: 54,
-    borderRadius: 18,
-    borderWidth: 2,
-    alignSelf: "center",
-  },
-  selectedHalo: {
-    borderRadius: 22,
-    borderWidth: 2.5,
-    padding: 3,
-    marginBottom: 2,
-  },
-  pinUpper: { alignItems: "center" },
-  /** Squircle “card” head — reads clearly on satellite & light map tiles */
-  pinBubble: {
-    width: 50,
-    height: 50,
-    borderRadius: 16,
-    borderWidth: 3,
-    backgroundColor: "#FFFFFF",
-    alignItems: "center",
-    justifyContent: "center",
-    position: "relative",
+    justifyContent: "flex-start",
     overflow: "visible",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.32,
-    shadowRadius: 8,
-    elevation: 12,
   },
-  pinBubbleDraft: {
-    backgroundColor: PRIMARY_SOFT,
-    borderStyle: "dashed",
-  },
-  pinBubbleInner: {
-    width: 40,
-    height: 40,
-    borderRadius: 14,
+  pinHead: {
+    width: PIN_HEAD,
+    height: PIN_HEAD,
+    borderRadius: PIN_HEAD / 2,
+    borderWidth: 3,
+    borderColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
   },
-  brandDot: {
-    position: "absolute",
-    bottom: 10,
-    width: 9,
-    height: 9,
-    borderRadius: 5,
-    backgroundColor: PRIMARY,
-    borderWidth: 2,
-    borderColor: "#FFFFFF",
+  pinHeadDraft: {
+    borderStyle: "dashed",
+    backgroundColor: PRIMARY_SOFT,
   },
-  pinTail: {
-    width: 0,
-    height: 0,
-    marginTop: -3,
-    borderLeftWidth: 11,
-    borderRightWidth: 11,
-    borderTopWidth: 14,
-    borderLeftColor: "transparent",
-    borderRightColor: "transparent",
+  pinStem: {
+    width: 4,
+    height: 10,
+    borderBottomLeftRadius: 2,
+    borderBottomRightRadius: 2,
+    marginTop: -2,
+  },
+  pinSelectedHalo: {
+    position: "absolute",
+    top: -4,
+    width: PIN_HEAD + 8,
+    height: PIN_HEAD + 8,
+    borderRadius: (PIN_HEAD + 8) / 2,
+    borderWidth: 3,
+    borderColor: PRIMARY + "CC",
+  },
+  pinPulseHalo: {
+    position: "absolute",
+    top: -3,
+    width: PIN_HEAD + 6,
+    height: PIN_HEAD + 6,
+    borderRadius: (PIN_HEAD + 6) / 2,
+    borderWidth: 2,
   },
 });
 
@@ -138,105 +197,38 @@ function MapPinBubble({
   /** “Drop pin here” — AllConnect accent, dashed ring */
   draft?: boolean;
 }) {
-  const drop = useRef(new Animated.Value(0)).current;
-  const fade = useRef(new Animated.Value(0)).current;
-  const ring = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    drop.setValue(-40);
-    fade.setValue(0);
-    ring.setValue(1);
-    Animated.parallel([
-      Animated.spring(drop, {
-        toValue: 0,
-        friction: 7,
-        tension: 220,
-        useNativeDriver: true,
-      }),
-      Animated.timing(fade, { toValue: 1, duration: 140, useNativeDriver: true }),
-    ]).start();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- entrance only on mount / marker remount (keyed by id)
-  }, []);
-
-  useEffect(() => {
-    if (!pulse) return;
-    ring.setValue(1);
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(ring, { toValue: 1.5, duration: 480, useNativeDriver: true }),
-        Animated.timing(ring, { toValue: 1, duration: 480, useNativeDriver: true }),
-      ])
-    );
-    loop.start();
-    const stop = setTimeout(() => {
-      loop.stop();
-      ring.setValue(1);
-    }, 2600);
-    return () => {
-      loop.stop();
-      clearTimeout(stop);
-    };
-  }, [pulse, ring]);
-
-  const scale = selected ? 1.1 : 1;
-  const ringColor = selected ? PRIMARY : color;
-  const tailColor = draft ? PRIMARY : color;
-  const innerBg = draft ? "#FFFFFF" : color;
-  const iconColor = draft ? PRIMARY : "#FFFFFF";
-
-  const bubbleShell = (
-    <View
-      style={[
-        ms.pinBubble,
-        draft && ms.pinBubbleDraft,
-        {
-          borderColor: draft ? PRIMARY : color,
-          shadowColor: draft ? PRIMARY : color,
-        },
-      ]}
-    >
-      <View style={[ms.pinBubbleInner, { backgroundColor: innerBg }]}>
-        <Ionicons name={icon} size={draft ? 22 : 20} color={iconColor} />
-      </View>
-      {!draft ? <View style={ms.brandDot} /> : null}
-    </View>
-  );
-
-  const head = (
-    <View style={ms.pinUpper}>
-      {selected ? <View style={[ms.selectedHalo, { borderColor: PRIMARY + "CC" }]}>{bubbleShell}</View> : bubbleShell}
-      <View style={[ms.pinTail, { borderTopColor: tailColor }]} />
-    </View>
-  );
+  const fill = draft ? PRIMARY_SOFT : color;
+  const iconColor = draft ? PRIMARY : iconOnCategoryFill(color);
+  const headSize = selected ? PIN_HEAD + 4 : PIN_HEAD;
+  const iconSize = draft ? 22 : selected ? 22 : 20;
 
   return (
-    <Animated.View
-      style={[
-        ms.pinStack,
-        {
-          opacity: fade,
-          transform: [{ translateY: drop }, { scale }],
-        },
-      ]}
-      collapsable={false}
-    >
+    <View style={ms.pinRoot} collapsable={false} renderToHardwareTextureAndroid>
+      {selected ? <View style={ms.pinSelectedHalo} pointerEvents="none" /> : null}
       {pulse ? (
-        <Animated.View
-          style={[
-            ms.pulseRing,
-            {
-              borderColor: ringColor,
-              transform: [{ scale: ring }],
-              opacity: ring.interpolate({
-                inputRange: [1, 1.5],
-                outputRange: [0.45, 0.06],
-              }),
-            },
-          ]}
-        />
+        <View style={[ms.pinPulseHalo, { borderColor: color + "99" }]} pointerEvents="none" />
       ) : null}
-      {head}
-    </Animated.View>
+      <View
+        style={[
+          ms.pinHead,
+          draft && ms.pinHeadDraft,
+          {
+            width: headSize,
+            height: headSize,
+            borderRadius: headSize / 2,
+            backgroundColor: fill,
+            borderColor: draft ? PRIMARY : "#FFFFFF",
+          },
+        ]}
+        collapsable={false}
+      >
+        <Ionicons name={icon} size={iconSize} color={iconColor} />
+      </View>
+      <View
+        style={[ms.pinStem, { backgroundColor: draft ? PRIMARY : color }]}
+        collapsable={false}
+      />
+    </View>
   );
 }
 
@@ -246,25 +238,26 @@ function EventMapMarker({
   pulse,
   onPress,
 }: {
-  pin: { id: string; lat: number; lng: number; category?: string };
+  pin: { id: string; lat: number; lng: number; category?: string; title?: string | null };
   selected: boolean;
   pulse: boolean;
   onPress: () => void;
 }) {
   const [tracksViewChanges, setTracksViewChanges] = useState(true);
+  const color = CATEGORY_COLORS[pin.category ?? ""] || PRIMARY;
+  const icon = resolveMarkerIconFromTitle(pin.title, pin.category);
   useEffect(() => {
     setTracksViewChanges(true);
-    const delay = pulse ? 3400 : 1000;
+    const delay = Platform.OS === "android" ? 4500 : 2200;
     const t = setTimeout(() => setTracksViewChanges(false), delay);
     return () => clearTimeout(t);
-  }, [pulse, pin.id, selected]);
-  const color = CATEGORY_COLORS[pin.category ?? ""] || PRIMARY;
-  const icon = CATEGORY_MARKER_ICONS[pin.category ?? ""] ?? "location";
+  }, [pin.id, selected, pin.title, pin.category, icon]);
   return (
     <AnyMarker
       coordinate={{ latitude: pin.lat, longitude: pin.lng }}
-      anchor={{ x: 0.5, y: 1 }}
-      tracksViewChanges={tracksViewChanges}
+      anchor={{ x: 0.5, y: 0.92 }}
+      zIndex={selected ? 5000 : 1}
+      tracksViewChanges={Platform.OS === "android" || tracksViewChanges}
       onPress={onPress}
     >
       <MapPinBubble color={color} icon={icon} selected={selected} pulse={pulse} />
@@ -279,11 +272,11 @@ function DraftMapMarker({
 }) {
   const [tracksViewChanges, setTracksViewChanges] = useState(true);
   useEffect(() => {
-    const t = setTimeout(() => setTracksViewChanges(false), 1200);
+    const t = setTimeout(() => setTracksViewChanges(false), Platform.OS === "android" ? 4500 : 2200);
     return () => clearTimeout(t);
   }, []);
   return (
-    <AnyMarker coordinate={coordinate} anchor={{ x: 0.5, y: 1 }} tracksViewChanges={tracksViewChanges}>
+    <AnyMarker coordinate={coordinate} anchor={{ x: 0.5, y: 0.92 }} zIndex={3000} tracksViewChanges={Platform.OS === "android" || tracksViewChanges}>
       <MapPinBubble color={PRIMARY} icon="add" selected={false} pulse={false} draft />
     </AnyMarker>
   );
@@ -552,6 +545,11 @@ export default function MapScreen() {
       setSearching(false);
     }
   }
+
+  const selectedDetailCat = selectedPin ? CATEGORY_COLORS[selectedPin.category] || PRIMARY : PRIMARY;
+  const selectedDetailIcon = selectedPin
+    ? resolveMarkerIconFromTitle(selectedPin.title, selectedPin.category)
+    : "location";
 
   return (
     <View style={{ flex: 1, backgroundColor: bg, minHeight: SCREEN_H }}>
@@ -822,10 +820,13 @@ export default function MapScreen() {
         <View style={[s.pinCard, { backgroundColor: surface, borderColor: border, bottom: TAB_BAR_BASE_HEIGHT + getBottomInset(insets.bottom) }]}>
           <View style={s.handle} />
           <View style={{ flexDirection: "row", alignItems: "flex-start", marginBottom: 12 }}>
-            <View style={{ flex: 1 }}>
+            <View style={[s.pinTitleIconBox, { backgroundColor: selectedDetailCat + "24" }]}>
+              <Ionicons name={selectedDetailIcon} size={22} color={selectedDetailCat} />
+            </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={[s.pinTitle, { color: text }]} numberOfLines={2}>{selectedPin.title}</Text>
-              <View style={[s.catBadge, { backgroundColor: (CATEGORY_COLORS[selectedPin.category] || PRIMARY) + "18" }]}>
-                <Text style={[s.catBadgeText, { color: CATEGORY_COLORS[selectedPin.category] || PRIMARY }]}>
+              <View style={[s.catBadge, { backgroundColor: selectedDetailCat + "18" }]}>
+                <Text style={[s.catBadgeText, { color: selectedDetailCat }]}>
                   {selectedPin.category}
                 </Text>
               </View>
@@ -1016,6 +1017,15 @@ const s = StyleSheet.create({
     shadowColor: "#000", shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 20,
   },
   handle: { width: 40, height: 4, borderRadius: 2, backgroundColor: "#AEAEB2", alignSelf: "center", marginBottom: 16 },
+  pinTitleIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
+    flexShrink: 0,
+  },
   pinTitle: { fontSize: 18, fontWeight: "700", marginBottom: 8, lineHeight: 24 },
   catBadge: { alignSelf: "flex-start", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
   catBadgeText: { fontSize: 12, fontWeight: "700", textTransform: "capitalize" },
