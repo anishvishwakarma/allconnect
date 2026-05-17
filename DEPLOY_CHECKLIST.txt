@@ -23,7 +23,7 @@ MOBILE
 --------------------------------------------------------------------------------
 [ ] mobile/.env — EXPO_PUBLIC_API_URL=https://allconnect.onrender.com
 
-[ ] For EAS/production build: Set EXPO_PUBLIC_API_URL in EAS Secrets
+[ ] For EAS/production build: EXPO_PUBLIC_API_URL in eas.json + run mobile/scripts/set-eas-secrets.ps1
 
 [ ] Firebase Console: Add your app domains if using Expo web
     (Auth → Settings → Authorized domains)

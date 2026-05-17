@@ -12,11 +12,19 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://allconnect.onrender.com",
+        "EXPO_PUBLIC_USE_MOCK_OTP": "false"
       }
     },
     "production": {
       "android": {
         "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://allconnect.onrender.com",
+        "EXPO_PUBLIC_USE_MOCK_OTP": "false"
       }
     }
   },
