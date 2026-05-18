@@ -32,6 +32,9 @@ MOBILE
 VERIFY
 --------------------------------------------------------------------------------
 [ ] https://allconnect.onrender.com/health → {"ok":true}
+[ ] https://allconnect.onrender.com/api/app/version?platform=android → version JSON
+[ ] Optional Render env: APP_LATEST_VERSION, APP_MIN_VERSION_ANDROID, APP_MIN_VERSION_IOS,
+    APP_STORE_URL_IOS (App Store link), APP_FORCE_UPDATE=true to block old builds
 [ ] Sign up, sign in, forgot password work
 [ ] Map loads nearby posts
 [ ] Create post, join request, chat work

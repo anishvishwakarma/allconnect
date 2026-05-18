@@ -6,10 +6,12 @@ import { SafeAreaProvider, initialWindowMetrics } from "react-native-safe-area-c
 import { ThemeProvider, useAppTheme } from "../context/ThemeContext";
 import { AlertProvider } from "../context/AlertContext";
 import { useAuthStore } from "../store/auth";
+import { useAppUpdateCheck } from "../hooks/useAppUpdateCheck";
 
 function RootStack() {
   const token = useAuthStore((s) => s.token);
   const hasHydrated = useAuthStore((s) => s.hasHydrated);
+  useAppUpdateCheck();
 
   useEffect(() => {
     if (!hasHydrated) return;

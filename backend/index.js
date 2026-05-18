@@ -14,6 +14,7 @@ const requestsRoutes = require('./routes/requests');
 const chatsRoutes = require('./routes/chats');
 const placesRoutes = require('./routes/places');
 const notificationsRoutes = require('./routes/notifications');
+const appRoutes = require('./routes/app');
 const { ensureNotificationsTable } = require('./services/notifications');
 
 const app = express();
@@ -60,6 +61,7 @@ app.use('/api/posts', postsRoutes);
 app.use('/api/chats', chatsRoutes);
 app.use('/api/places', placesRoutes);
 app.use('/api/notifications', notificationsRoutes);
+app.use('/api/app', appRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });
