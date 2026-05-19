@@ -3,7 +3,7 @@ import { Tabs } from "expo-router";
 import { View, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { getBottomInset } from "../../constants/config";
+import { getBottomInset, TAB_BAR_CONTENT_HEIGHT } from "../../constants/config";
 import { useAuthStore } from "../../store/auth";
 import { useBadgeStore } from "../../store/badges";
 import { getSocket } from "../../services/socket";
@@ -55,7 +55,7 @@ export default function TabsLayout() {
           backgroundColor: bg,
           borderTopColor: border,
           borderTopWidth: StyleSheet.hairlineWidth,
-          height: 56 + getBottomInset(insets.bottom),
+          height: TAB_BAR_CONTENT_HEIGHT + getBottomInset(insets.bottom),
           paddingBottom: getBottomInset(insets.bottom),
           paddingTop: 10,
           elevation: 0,

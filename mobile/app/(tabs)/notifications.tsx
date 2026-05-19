@@ -3,7 +3,7 @@ import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, 
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { getBottomInset } from "../../constants/config";
+import { getBottomInset, getTopInset } from "../../constants/config";
 import { useAuthStore } from "../../store/auth";
 import { useBadgeStore } from "../../store/badges";
 import { notificationsApi } from "../../services/api";
@@ -103,7 +103,7 @@ export default function NotificationsScreen() {
 
   if (!token) {
     return (
-      <View style={[s.center, { backgroundColor: bg, paddingTop: insets.top, paddingBottom: getBottomInset(insets.bottom) }]}>
+      <View style={[s.center, { backgroundColor: bg, paddingTop: getTopInset(insets.top), paddingBottom: getBottomInset(insets.bottom) }]}>
         <Ionicons name="notifications-outline" size={46} color={PRIMARY} />
         <Text style={[s.emptyTitle, { color: text }]}>Sign in for notifications</Text>
         <Text style={[s.emptySub, { color: sub }]}>You will see message and request updates here</Text>
@@ -113,7 +113,7 @@ export default function NotificationsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: bg }}>
-      <View style={[s.header, { borderBottomColor: border, paddingTop: insets.top + 16 }]}>
+      <View style={[s.header, { borderBottomColor: border, paddingTop: getTopInset(insets.top) + 16 }]}>
         <Text style={[s.title, { color: text }]}>Notifications</Text>
         <TouchableOpacity onPress={markAllRead} disabled={markingAll || items.every((i) => !!i.read_at)}>
           <Text style={[s.markAll, { color: markingAll ? sub : PRIMARY }]}>

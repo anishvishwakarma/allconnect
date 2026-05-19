@@ -10,7 +10,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { postsApi, placesApi } from "../../services/api";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { getBottomInset, FREE_POST_LIMIT, CATEGORY_COLORS } from "../../constants/config";
+import { getBottomInset, getTopInset, FREE_POST_LIMIT, CATEGORY_COLORS } from "../../constants/config";
 import { useAuthStore } from "../../store/auth";
 import { POST_CATEGORIES } from "../../types";
 import { useAppTheme } from "../../context/ThemeContext";
@@ -132,7 +132,7 @@ export default function CreatePostScreen() {
 
   if (!token) {
     return (
-      <View style={[s.center, { backgroundColor: bg, paddingTop: insets.top, paddingBottom: getBottomInset(insets.bottom) }]}>
+      <View style={[s.center, { backgroundColor: bg, paddingTop: getTopInset(insets.top), paddingBottom: getBottomInset(insets.bottom) }]}>
         <Ionicons name="add-circle-outline" size={56} color={PRIMARY} />
         <Text style={[s.emptyTitle, { color: text }]}>Sign in to post</Text>
         <Text style={[s.emptySub, { color: sub }]}>Share what you're doing and find people nearby</Text>
@@ -248,7 +248,7 @@ export default function CreatePostScreen() {
   return (
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1, backgroundColor: bg }}>
       {/* Header */}
-      <View style={[s.header, { borderBottomColor: border, paddingTop: insets.top + 16 }]}>
+      <View style={[s.header, { borderBottomColor: border, paddingTop: getTopInset(insets.top) + 16 }]}>
         <Text style={[s.title, { color: text }]}>Create Post</Text>
         {!hasSubscription && (
           <View style={[s.limitBadge, { backgroundColor: freeRemaining > 0 ? PRIMARY + "18" : "#FF453A18" }]}>

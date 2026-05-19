@@ -1,8 +1,17 @@
 import { useEffect, useRef } from "react";
 import { TouchableOpacity, Text, StyleSheet, Platform, View } from "react-native";
 import Constants from "expo-constants";
+import * as WebBrowser from "expo-web-browser";
 import * as Google from "expo-auth-session/providers/google";
+import {
+  AuthRequest,
+  ResponseType,
+  fetchDiscoveryAsync,
+  makeRedirectUri,
+} from "expo-auth-session";
 import { Ionicons } from "@expo/vector-icons";
+
+WebBrowser.maybeCompleteAuthSession();
 
 export type GoogleOAuthExtra = {
   webClientId?: string;
@@ -20,8 +29,89 @@ export function isGoogleOAuthConfigured(): boolean {
   if (!g?.webClientId?.trim()) return false;
   if (Platform.OS === "web") return true;
   if (Platform.OS === "ios") return !!g.iosClientId?.trim();
-  // Android native Google Sign-In only needs Web client ID for Firebase idToken; ensure Android OAuth client + SHA-1 exist in Google Cloud.
   return true;
+}
+
+function isDeveloperError(e: unknown): boolean {
+  const code = typeof e === "object" && e !== null && "code" in e ? String((e as { code?: string }).code) : "";
+  const msg = e instanceof Error ? e.message : String(e ?? "");
+  return code === "10" || /DEVELOPER_ERROR|developer console is not set up correctly/i.test(msg);
+}
+
+function formatDeveloperError(): string {
+  return (
+    "Google Sign-In is not linked to this app install (SHA-1 mismatch).\n\n" +
+    "1. Firebase Console → Project settings → Your Android app (com.allconnect.app)\n" +
+    "2. Add SHA-1 from Play Console → Setup → App integrity → App signing key certificate\n" +
+    "3. Also add EAS upload keystore SHA-1: run in mobile/ → npx eas credentials -p android\n" +
+    "4. Download google-services.json into mobile/ and run a new EAS production build\n\n" +
+    "See mobile/GOOGLE_SIGNIN_SETUP.md for details."
+  );
+}
+
+function validateGoogleClientIds(extra: GoogleOAuthExtra | undefined): string | null {
+  const web = extra?.webClientId?.trim() || "";
+  const android = extra?.androidClientId?.trim() || "";
+  if (web && android && web === android) {
+    return "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID must be the Web client ID from Firebase, not the Android client ID.";
+  }
+  return null;
+}
+
+function buildGoogleSignInConfig(extra: GoogleOAuthExtra | undefined) {
+  const web = extra?.webClientId?.trim() || "";
+  const config: {
+    webClientId: string;
+    iosClientId?: string;
+    offlineAccess: boolean;
+  } = {
+    webClientId: web,
+    offlineAccess: false,
+  };
+  if (Platform.OS === "ios") {
+    const ios = extra?.iosClientId?.trim();
+    if (ios && ios !== web) config.iosClientId = ios;
+  }
+  return config;
+}
+
+/** Browser OAuth fallback (e.g. when native SDK hits DEVELOPER_ERROR on misconfigured SHA-1). */
+async function signInWithGoogleBrowser(): Promise<string> {
+  const extra = getGoogleExtra();
+  const web = extra?.webClientId?.trim() || "";
+  const android = extra?.androidClientId?.trim() || "";
+  const ios = extra?.iosClientId?.trim() || "";
+
+  const clientId =
+    Platform.OS === "android"
+      ? android || web
+      : Platform.OS === "ios"
+        ? (ios && ios !== web ? ios : web)
+        : web;
+
+  if (!clientId) throw new Error("Google Sign-In is not configured.");
+
+  const redirectUri = makeRedirectUri({ scheme: "allconnect" });
+  const discovery = await fetchDiscoveryAsync("https://accounts.google.com");
+  const request = new AuthRequest({
+    clientId,
+    scopes: ["openid", "profile", "email"],
+    redirectUri,
+    responseType: ResponseType.IdToken,
+  });
+
+  const result = await request.promptAsync(discovery);
+  if (result.type === "cancel" || result.type === "dismiss") {
+    throw Object.assign(new Error("cancelled"), { code: "SIGN_IN_CANCELLED" });
+  }
+  if (result.type !== "success") {
+    throw new Error("Google sign-in was cancelled or failed.");
+  }
+  const idToken = typeof result.params?.id_token === "string" ? result.params.id_token : "";
+  if (!idToken) {
+    throw new Error("No ID token from Google. Check OAuth client and redirect URIs in Google Cloud Console.");
+  }
+  return idToken;
 }
 
 function GoogleSignInBrowser({
@@ -57,7 +147,7 @@ function GoogleSignInBrowser({
           : typeof response.error?.message === "string"
             ? response.error.message
             : response.error?.toString?.() || "Google sign-in was cancelled or failed.";
-      onError?.(desc);
+      onError?.(isDeveloperError({ message: desc }) ? formatDeveloperError() : desc);
       return;
     }
     if (response.type !== "success") return;
@@ -77,6 +167,11 @@ function GoogleSignInBrowser({
       style={[styles.googleBtn, { borderColor, backgroundColor }]}
       disabled={!request || disabled}
       onPress={() => {
+        const configErr = validateGoogleClientIds(extra);
+        if (configErr) {
+          onError?.(configErr);
+          return;
+        }
         void promptAsync().catch((e) => onError?.(e?.message || "Could not open Google sign-in."));
       }}
       activeOpacity={0.85}
@@ -109,16 +204,17 @@ function GoogleSignInNative({
   useEffect(() => {
     const web = extra?.webClientId?.trim();
     if (!web || Constants.appOwnership === "expo") return;
+    const configErr = validateGoogleClientIds(extra);
+    if (configErr) {
+      onError?.(configErr);
+      return;
+    }
     let cancelled = false;
     void (async () => {
       try {
         const { GoogleSignin } = await import("@react-native-google-signin/google-signin");
         if (cancelled) return;
-        GoogleSignin.configure({
-          webClientId: web,
-          iosClientId: extra?.iosClientId?.trim() || undefined,
-          offlineAccess: false,
-        });
+        GoogleSignin.configure(buildGoogleSignInConfig(extra));
       } catch (e: unknown) {
         if (!cancelled) onError?.(e instanceof Error ? e.message : "Google Sign-In configuration failed.");
       }
@@ -126,7 +222,7 @@ function GoogleSignInNative({
     return () => {
       cancelled = true;
     };
-  }, [extra?.webClientId, extra?.iosClientId, onError]);
+  }, [extra?.webClientId, extra?.iosClientId, extra?.androidClientId, onError]);
 
   async function handlePress() {
     const web = extra?.webClientId?.trim();
@@ -134,13 +230,15 @@ function GoogleSignInNative({
       onError?.("Google Sign-In is not configured.");
       return;
     }
+    const configErr = validateGoogleClientIds(extra);
+    if (configErr) {
+      onError?.(configErr);
+      return;
+    }
+
     try {
       const { GoogleSignin } = await import("@react-native-google-signin/google-signin");
-      GoogleSignin.configure({
-        webClientId: web,
-        iosClientId: extra?.iosClientId?.trim() || undefined,
-        offlineAccess: false,
-      });
+      GoogleSignin.configure(buildGoogleSignInConfig(extra));
       if (Platform.OS === "android") {
         await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
       }
@@ -152,13 +250,32 @@ function GoogleSignInNative({
         idToken = tokens.idToken;
       }
       if (!idToken) {
-        onError?.("No ID token. In Google Cloud Console, add your app’s SHA-1 to the Android OAuth client and use the Web client ID from Firebase as EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID.");
+        onError?.(
+          "No ID token. Add your app SHA-1 in Firebase, use the Web client ID as EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID, and rebuild."
+        );
         return;
       }
       onIdToken(idToken);
     } catch (e: unknown) {
       const code = typeof e === "object" && e !== null && "code" in e ? String((e as { code?: string }).code) : "";
       if (code === "SIGN_IN_CANCELLED" || code === "12501") return;
+
+      if (isDeveloperError(e)) {
+        try {
+          const idToken = await signInWithGoogleBrowser();
+          onIdToken(idToken);
+          return;
+        } catch (fallbackErr: unknown) {
+          const fallbackCode =
+            typeof fallbackErr === "object" && fallbackErr !== null && "code" in fallbackErr
+              ? String((fallbackErr as { code?: string }).code)
+              : "";
+          if (fallbackCode === "SIGN_IN_CANCELLED") return;
+        }
+        onError?.(formatDeveloperError());
+        return;
+      }
+
       const msg = e instanceof Error ? e.message : "Google sign-in failed.";
       onError?.(msg);
     }

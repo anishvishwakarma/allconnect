@@ -1,10 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  ActivityIndicator, Dimensions, TextInput,
+  ActivityIndicator, TextInput,
   Platform,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import MapView, { Marker, PROVIDER_GOOGLE, MapMarkerProps } from "react-native-maps";
 // Workaround: react-native-maps types omit React's built-in `key` prop
 const AnyMarker = Marker as React.ComponentType<MapMarkerProps & { key?: React.Key; children?: React.ReactNode }>;
@@ -15,13 +14,15 @@ import { useAuthStore } from "../../store/auth";
 import { postsApi, requestsApi, placesApi } from "../../services/api";
 import { useAppTheme } from "../../context/ThemeContext";
 import { useAlert } from "../../context/AlertContext";
-import { getBottomInset, CATEGORY_COLORS } from "../../constants/config";
+import { CATEGORY_COLORS } from "../../constants/config";
+import { useAppInsets } from "../../hooks/useAppInsets";
 
 const PRIMARY = "#E8751A";
 const PRIMARY_SOFT = "#FFF3E8";
 const AUTO_REFRESH_INTERVAL_MS = 45000;
-const TAB_BAR_BASE_HEIGHT = 56;
-const { height: SCREEN_H } = Dimensions.get("window");
+
+/** Map tab content already sits above the tab bar — do not add tabBarHeight to map overlays. */
+const MAP_EDGE_BOTTOM = 12;
 
 const CATEGORIES = ["activity","need","selling","meetup","event","study","nightlife","other"] as const;
 const WHEN_FILTERS = [
@@ -283,7 +284,7 @@ function DraftMapMarker({
 }
 
 export default function MapScreen() {
-  const insets = useSafeAreaInsets();
+  const { top, left, right } = useAppInsets();
   const token = useAuthStore((s) => s.token);
   const user = useAuthStore((s) => s.user);
   const { isDark } = useAppTheme();
@@ -551,14 +552,16 @@ export default function MapScreen() {
     ? resolveMarkerIconFromTitle(selectedPin.title, selectedPin.category)
     : "location";
 
+  const mapBottomPadding = selectedPin ? 200 : draftPin ? 96 : MAP_EDGE_BOTTOM;
+
   return (
-    <View style={{ flex: 1, backgroundColor: bg, minHeight: SCREEN_H }}>
+    <View style={{ flex: 1, backgroundColor: bg }}>
       <MapView
         key={mapKey}
         ref={mapRef}
         provider={PROVIDER_GOOGLE}
-        style={[StyleSheet.absoluteFillObject, { minHeight: SCREEN_H }]}
-        mapPadding={{ bottom: TAB_BAR_BASE_HEIGHT + getBottomInset(insets.bottom), top: 0, left: 0, right: 0 }}
+        style={StyleSheet.absoluteFillObject}
+        mapPadding={{ bottom: mapBottomPadding, top, left, right }}
         initialRegion={region}
         mapType="standard"
         onRegionChangeComplete={(r) => scheduleFetchForRegion(r, false)}
@@ -635,7 +638,7 @@ export default function MapScreen() {
       )}
 
       {/* ── Search bar + Filter chips + Refresh ── */}
-      <View style={[s.filtersContainer, { top: insets.top + 8 }]}>
+      <View style={[s.filtersContainer, { top: top + 8, left, right }]}>
         <View style={[s.searchBar, { backgroundColor: surface, borderColor: border }]}>
           <Ionicons name="search" size={16} color={sub} style={{ marginRight: 6 }} />
           <ScrollView
@@ -803,13 +806,13 @@ export default function MapScreen() {
       </View>
 
       {/* ── Location FAB (always visible so user can re-center; tap to go to current location) ── */}
-      <TouchableOpacity onPress={getLocation} disabled={locating} style={[s.fab, { backgroundColor: surface, borderColor: border, right: 20, bottom: (selectedPin ? 220 : 100) + getBottomInset(insets.bottom) }]}>
+      <TouchableOpacity onPress={getLocation} disabled={locating} style={[s.fab, { backgroundColor: surface, borderColor: border, right: 20 + right, bottom: selectedPin ? 220 : 100 }]}>
         {locating ? <ActivityIndicator size="small" color={PRIMARY} /> : <Ionicons name="locate-outline" size={20} color={PRIMARY} />}
       </TouchableOpacity>
 
       {/* ── Loading indicator (hide when map failed so we don't show both) ── */}
       {loading && !mapLoadError && (
-        <View style={[s.loadingBadge, { backgroundColor: surface, top: insets.top + 110 }]}>
+        <View style={[s.loadingBadge, { backgroundColor: surface, top: top + 110 }]}>
           <ActivityIndicator size="small" color={PRIMARY} />
           <Text style={[s.loadingText, { color: sub }]}>Refreshing...</Text>
         </View>
@@ -817,7 +820,7 @@ export default function MapScreen() {
 
       {/* ── Pin detail card (above tab bar so View Details is fully visible) ── */}
       {selectedPin && (
-        <View style={[s.pinCard, { backgroundColor: surface, borderColor: border, bottom: TAB_BAR_BASE_HEIGHT + getBottomInset(insets.bottom) }]}>
+        <View style={[s.pinCard, { backgroundColor: surface, borderColor: border, bottom: MAP_EDGE_BOTTOM, left, right }]}>
           <View style={s.handle} />
           <View style={{ flexDirection: "row", alignItems: "flex-start", marginBottom: 12 }}>
             <View style={[s.pinTitleIconBox, { backgroundColor: selectedDetailCat + "24" }]}>
@@ -888,7 +891,7 @@ export default function MapScreen() {
         </View>
       )}
       {draftPin && !selectedPin && (
-        <View style={[s.draftCard, { backgroundColor: surface, borderColor: border, bottom: TAB_BAR_BASE_HEIGHT + getBottomInset(insets.bottom) + 80 }]}>
+        <View style={[s.draftCard, { backgroundColor: surface, borderColor: border, bottom: 88, marginHorizontal: Math.max(left, 16) }]}>
           <Text style={[s.draftTitle, { color: text }]}>Create post here?</Text>
           <Text style={[s.draftSub, { color: sub }]}>
             Long-pressed location on the map. You can fine-tune details on the next screen.

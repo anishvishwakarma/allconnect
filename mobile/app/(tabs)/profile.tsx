@@ -11,7 +11,7 @@ import { useBadgeStore } from "../../store/badges";
 import { disconnectSocket } from "../../services/socket";
 import { getInitials } from "../../utils/profile";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { getBottomInset, FREE_POST_LIMIT } from "../../constants/config";
+import { getBottomInset, getTopInset, FREE_POST_LIMIT } from "../../constants/config";
 import { useAppTheme } from "../../context/ThemeContext";
 import { useAlert } from "../../context/AlertContext";
 
@@ -53,7 +53,7 @@ export default function ProfileScreen() {
 
   if (!token) {
     return (
-      <View style={[s.center, { backgroundColor: bg, paddingTop: insets.top, paddingBottom: getBottomInset(insets.bottom) }]}>
+      <View style={[s.center, { backgroundColor: bg, paddingTop: getTopInset(insets.top), paddingBottom: getBottomInset(insets.bottom) }]}>
         <View style={[s.bigAvatar, { backgroundColor: PRIMARY + "18" }]}>
           <Ionicons name="person-circle-outline" size={48} color={PRIMARY} />
         </View>
@@ -97,7 +97,7 @@ export default function ProfileScreen() {
   return (
     <ScrollView style={{ flex: 1, backgroundColor: bg }} contentContainerStyle={{ paddingBottom: getBottomInset(insets.bottom) + 24 }} showsVerticalScrollIndicator={false}>
       {/* Header */}
-      <View style={[s.header, { borderBottomColor: border, paddingTop: insets.top + 16 }]}>
+      <View style={[s.header, { borderBottomColor: border, paddingTop: getTopInset(insets.top) + 16 }]}>
         <Text style={[s.title, { color: text }]}>Profile</Text>
         {!editing ? (
           <TouchableOpacity onPress={() => setEditing(true)} style={[s.editBtn, { backgroundColor: PRIMARY + "18", borderColor: PRIMARY + "40" }]}>

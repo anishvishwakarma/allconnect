@@ -7,7 +7,7 @@ import {
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { getBottomInset, CATEGORY_COLORS } from "../../constants/config";
+import { getBottomInset, getTopInset, CATEGORY_COLORS } from "../../constants/config";
 import { useAuthStore } from "../../store/auth";
 import { chatsApi } from "../../services/api";
 import { useBadgeStore } from "../../store/badges";
@@ -68,7 +68,7 @@ export default function ChatsScreen() {
 
   if (!token) {
     return (
-      <View style={[s.center, { backgroundColor: bg, paddingTop: insets.top, paddingBottom: getBottomInset(insets.bottom) }]}>
+      <View style={[s.center, { backgroundColor: bg, paddingTop: getTopInset(insets.top), paddingBottom: getBottomInset(insets.bottom) }]}>
         <Ionicons name="chatbubbles-outline" size={48} color={PRIMARY} />
         <Text style={[s.emptyTitle, { color: text }]}>Sign in for chats</Text>
         <Text style={[s.emptySub, { color: sub }]}>Group chats appear after your join request is approved</Text>
@@ -81,7 +81,7 @@ export default function ChatsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: bg }}>
-      <View style={[s.header, { borderBottomColor: border, paddingTop: insets.top + 16 }]}>
+      <View style={[s.header, { borderBottomColor: border, paddingTop: getTopInset(insets.top) + 16 }]}>
         <Text style={[s.title, { color: text }]}>Chats</Text>
         <Text style={[s.subtitle, { color: sub }]}>Your group chats · archived after event (read-only)</Text>
       </View>

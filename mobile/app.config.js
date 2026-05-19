@@ -1,8 +1,12 @@
 // Load .env so "eas build" and "expo config" see EXPO_PUBLIC_* when run locally; EAS cloud injects secrets
+const fs = require('fs');
 const path = require('path');
 try {
   require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 } catch (_) {}
+
+const googleServicesFile = path.resolve(__dirname, 'google-services.json');
+const hasGoogleServices = fs.existsSync(googleServicesFile);
 
 // Single key (Expo Go + fallback), or use platform-specific keys for EAS builds
 const mapsApiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || "";
@@ -37,10 +41,10 @@ function iosGoogleUrlSchemeFromClientId(iosClientId) {
 }
 
 const googleIosUrlScheme = iosGoogleUrlSchemeFromClientId(google.iosClientId);
-const googleSignInPlugin =
-  googleIosUrlScheme.startsWith("com.googleusercontent.apps.")
-    ? [["@react-native-google-signin/google-signin", { iosUrlScheme: googleIosUrlScheme }]]
-    : [];
+const googleSignInPluginOptions = googleIosUrlScheme.startsWith("com.googleusercontent.apps.")
+  ? { iosUrlScheme: googleIosUrlScheme }
+  : {};
+const googleSignInPlugin = [["@react-native-google-signin/google-signin", googleSignInPluginOptions]];
 
 const requiredEnv = [
   ["EXPO_PUBLIC_GOOGLE_MAPS_API_KEY", mapsApiKey],
@@ -63,11 +67,12 @@ if (missingEnv.length > 0) {
 module.exports = {
   expo: {
     name: "AllConnect",
-    // Use embedded bundle only — no OTA update fetch (avoids "Failed to download remote update" crash)
+    // Embedded JS only — never fetch EAS/OTA updates (fixes Android "Failed to download remote update")
     updates: {
       enabled: false,
       checkAutomatically: "NEVER",
       fallbackToCacheTimeout: 0,
+      useEmbeddedUpdate: true,
     },
     extra: {
       eas: {
@@ -77,7 +82,7 @@ module.exports = {
       google,
     },
     slug: "allconnect",
-    version: "1.1.2",
+    version: "1.1.3",
     orientation: "portrait",
     icon: "./assets/icon.png",
     userInterfaceStyle: "automatic",
@@ -90,7 +95,7 @@ module.exports = {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.allconnect.app",
-      buildNumber: "4",
+      buildNumber: "5",
       config: { googleMapsApiKey: mapsApiKeyIos },
       infoPlist: {
         NSPhotoLibraryUsageDescription: "AllConnect needs photo access to set your profile picture.",
@@ -98,12 +103,13 @@ module.exports = {
       },
     },
     android: {
+      ...(hasGoogleServices ? { googleServicesFile: "./google-services.json" } : {}),
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#E8751A",
       },
       package: "com.allconnect.app",
-      versionCode: 4,
+      versionCode: 5,
       /** Lets the window shrink when the keyboard opens so ScrollView can reach password / buttons. */
       softwareKeyboardLayoutMode: "resize",
       config: {
@@ -111,6 +117,7 @@ module.exports = {
       },
     },
     plugins: [
+      "expo-updates",
       "expo-router",
       [
         "expo-location",

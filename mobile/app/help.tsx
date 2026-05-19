@@ -2,7 +2,7 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-nati
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { getBottomInset } from "../constants/config";
+import { screenSafePadding } from "../constants/config";
 import { useAppTheme } from "../context/ThemeContext";
 
 const PRIMARY = "#E8751A";
@@ -19,7 +19,7 @@ export default function HelpScreen() {
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: bg }}
-      contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: getBottomInset(insets.bottom) + 24, paddingHorizontal: 20 }}
+      contentContainerStyle={{ ...screenSafePadding(insets, { top: 12, bottom: 24, horizontal: 20 }) }}
       showsVerticalScrollIndicator={false}
     >
       <View style={[s.header, { borderBottomColor: border }]}>

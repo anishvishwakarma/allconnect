@@ -1,3 +1,5 @@
+import { Platform } from "react-native";
+
 /** REST + Socket base URL. Set EXPO_PUBLIC_API_URL in .env. Default: production (localhost only works when running backend locally) */
 export const API_URL =
   (process.env.EXPO_PUBLIC_API_URL as string | undefined)?.trim() || 'https://allconnect.onrender.com';
@@ -47,13 +49,58 @@ export const USE_MOCK_OTP =
 /** India: mobile number must be exactly 10 digits (after +91) */
 export const INDIA_MOBILE_LENGTH = 10;
 
+/** Tab bar content height (excluding OS bottom inset). */
+export const TAB_BAR_CONTENT_HEIGHT = 56;
+
+/** Max content width on tablets / wide phones — keeps forms readable, centered. */
+export const MAX_SCREEN_CONTENT_WIDTH = 720;
+
+type EdgeInsets = { top: number; bottom: number; left: number; right: number };
+
 /**
- * Bottom safe inset from the OS (navigation bar / home indicator / tablet taskbar).
- * When there is no system nav inset, this is 0 — layout can use the full height.
- * When back / home / recent (or gesture bar / iPhone home indicator) is present, use the returned value so UI does not overlap.
+ * Top inset: status bar, notch, Dynamic Island, tablet status area.
+ * Fallback when edge-to-edge Android reports 0.
+ */
+export function getTopInset(top: number): number {
+  const raw = Math.max(0, top);
+  if (raw > 0) return raw;
+  if (Platform.OS === "android") return 28;
+  return 0;
+}
+
+/**
+ * Bottom inset: home indicator, gesture nav, 3-button nav, tablet taskbar.
+ * Fallback when edge-to-edge Android reports 0 (avoids overlap with system UI).
  */
 export function getBottomInset(bottom: number): number {
-  return Math.max(0, bottom);
+  const raw = Math.max(0, bottom);
+  if (raw > 0) return Math.max(raw, Platform.OS === "android" ? 8 : 4);
+  if (Platform.OS === "android") return 28;
+  if (Platform.OS === "ios") return 12;
+  return 0;
+}
+
+export function getHorizontalInsets(left: number, right: number): { left: number; right: number } {
+  return { left: Math.max(0, left), right: Math.max(0, right) };
+}
+
+/** Standard screen padding from OS safe areas (phones, notches, tablets, landscape). */
+export function screenSafePadding(
+  insets: EdgeInsets,
+  extra?: { top?: number; bottom?: number; horizontal?: number }
+) {
+  const h = getHorizontalInsets(insets.left, insets.right);
+  const padH = extra?.horizontal ?? 0;
+  return {
+    paddingTop: getTopInset(insets.top) + (extra?.top ?? 0),
+    paddingBottom: getBottomInset(insets.bottom) + (extra?.bottom ?? 0),
+    paddingLeft: h.left + padH,
+    paddingRight: h.right + padH,
+  };
+}
+
+export function tabBarTotalHeight(bottomInset: number): number {
+  return TAB_BAR_CONTENT_HEIGHT + getBottomInset(bottomInset);
 }
 
 /** Public privacy policy URL (required for store listings; also used in-app for "View full policy"). */

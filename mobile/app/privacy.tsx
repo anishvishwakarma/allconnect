@@ -2,7 +2,7 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View, Linking } from "r
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { getBottomInset, PRIVACY_POLICY_URL } from "../constants/config";
+import { screenSafePadding, PRIVACY_POLICY_URL } from "../constants/config";
 import { useAppTheme } from "../context/ThemeContext";
 
 export default function PrivacyScreen() {
@@ -18,7 +18,7 @@ export default function PrivacyScreen() {
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: bg }}
-      contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: getBottomInset(insets.bottom) + 24, paddingHorizontal: 20 }}
+      contentContainerStyle={{ ...screenSafePadding(insets, { top: 12, bottom: 24, horizontal: 20 }) }}
       showsVerticalScrollIndicator={false}
     >
       <View style={[s.header, { borderBottomColor: border }]}>

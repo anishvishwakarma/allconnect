@@ -7,7 +7,7 @@ import {
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { getBottomInset, CATEGORY_COLORS } from "../../constants/config";
+import { getBottomInset, getTopInset, CATEGORY_COLORS } from "../../constants/config";
 import { useAuthStore } from "../../store/auth";
 import { useBadgeStore } from "../../store/badges";
 import { postsApi } from "../../services/api";
@@ -56,7 +56,7 @@ export default function HistoryScreen() {
 
   if (!token) {
     return (
-      <View style={[s.center, { backgroundColor: bg, paddingTop: insets.top, paddingBottom: getBottomInset(insets.bottom) }]}>
+      <View style={[s.center, { backgroundColor: bg, paddingTop: getTopInset(insets.top), paddingBottom: getBottomInset(insets.bottom) }]}>
         <Ionicons name="time-outline" size={48} color={PRIMARY} />
         <Text style={[s.emptyTitle, { color: text }]}>Sign in to see history</Text>
         <Text style={[s.emptySub, { color: sub }]}>Posts you created or joined will appear here</Text>
@@ -69,7 +69,7 @@ export default function HistoryScreen() {
 
   return (
     <View style={[{ flex: 1 }, { backgroundColor: bg }]}>
-      <View style={[s.header, { borderBottomColor: border, paddingTop: insets.top + 16 }]}>
+      <View style={[s.header, { borderBottomColor: border, paddingTop: getTopInset(insets.top) + 16 }]}>
         <Text style={[s.title, { color: text }]}>History</Text>
         <Text style={[s.subtitle, { color: sub }]}>Your posts and joined events</Text>
       </View>

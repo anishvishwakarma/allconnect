@@ -10,8 +10,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { chatsApi } from "../../services/api";
 import { getSocket, joinChatRoom, leaveChatRoom, emitTyping, emitStopTyping } from "../../services/socket";
 import { useAuthStore } from "../../store/auth";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { getBottomInset } from "../../constants/config";
+import { useAppInsets } from "../../hooks/useAppInsets";
 import { useAppTheme } from "../../context/ThemeContext";
 import { useAlert } from "../../context/AlertContext";
 import { useBadgeStore } from "../../store/badges";
@@ -19,7 +18,7 @@ import { useBadgeStore } from "../../store/badges";
 const PRIMARY = "#E8751A";
 
 export default function ChatScreen() {
-  const insets = useSafeAreaInsets();
+  const { top, bottom, raw: insets } = useAppInsets();
   const { id: rawId } = useLocalSearchParams<{ id: string }>();
   const id = typeof rawId === "string" ? rawId : Array.isArray(rawId) ? rawId[0] : "";
   const user = useAuthStore((s) => s.user);
@@ -165,7 +164,7 @@ export default function ChatScreen() {
 
   if (token && !id) {
     return (
-      <View style={[s.center, { flex: 1, backgroundColor: bg, paddingTop: insets.top, paddingBottom: getBottomInset(insets.bottom) }]}>
+      <View style={[s.center, { flex: 1, backgroundColor: bg, paddingTop: top, paddingBottom: bottom }]}>
         <Text style={[s.emptyTitle, { color: text }]}>Chat not found</Text>
         <TouchableOpacity onPress={() => router.back()} style={[s.backCta]}>
           <Text style={[s.backCtaText, { color: PRIMARY }]}>Go back</Text>
@@ -174,20 +173,15 @@ export default function ChatScreen() {
     );
   }
 
-  /** When the OS reports 0 bottom inset (common on edge-to-edge Android), keep bars above system nav. */
-  const rawBottom = getBottomInset(insets.bottom);
-  const bottomInset =
-    rawBottom > 0 ? Math.max(rawBottom, 8) : Platform.OS === "android" ? 28 : 12;
-
   return (
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: bg }}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       enabled={Platform.OS === "ios"}
-      keyboardVerticalOffset={Platform.OS === "ios" ? insets.top + 56 : 0}
+      keyboardVerticalOffset={Platform.OS === "ios" ? top + 56 : 0}
     >
       {/* Header */}
-      <View style={[s.header, { backgroundColor: surface, borderBottomColor: border, paddingTop: insets.top + 12 }]}>
+      <View style={[s.header, { backgroundColor: surface, borderBottomColor: border, paddingTop: top + 12 }]}>
         <TouchableOpacity onPress={() => router.back()} style={[s.backBtn, { backgroundColor: isDark ? "#252528" : "#F0F0F3" }]}>
           <Ionicons name="arrow-back" size={18} color={PRIMARY} />
         </TouchableOpacity>
@@ -210,7 +204,7 @@ export default function ChatScreen() {
           data={messages}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: bottomInset + 8, gap: 4 }}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: bottom + 8, gap: 4 }}
           onContentSizeChange={() => flatRef.current?.scrollToEnd({ animated: false })}
           ListEmptyComponent={
             <View style={s.center}>
@@ -236,7 +230,7 @@ export default function ChatScreen() {
 
       {/* Input bar */}
       {!expired ? (
-        <View style={[s.inputBar, { backgroundColor: surface, borderTopColor: border, paddingBottom: bottomInset }]}>
+        <View style={[s.inputBar, { backgroundColor: surface, borderTopColor: border, paddingBottom: bottom }]}>
           <TextInput
             value={input} onChangeText={handleChange}
             placeholder="Message..." placeholderTextColor={sub}
@@ -252,7 +246,7 @@ export default function ChatScreen() {
           </TouchableOpacity>
         </View>
       ) : (
-        <View style={[s.expiredBar, { backgroundColor: "#FF453A10", borderTopColor: "#FF453A30", paddingBottom: bottomInset }]}>
+        <View style={[s.expiredBar, { backgroundColor: "#FF453A10", borderTopColor: "#FF453A30", paddingBottom: bottom }]}>
           <Ionicons name="lock-closed-outline" size={14} color="#FF453A" />
           <Text style={s.expiredBarText}>Chat ended · read-only (replies disabled)</Text>
         </View>

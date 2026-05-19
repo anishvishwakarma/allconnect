@@ -12,7 +12,6 @@ import {
   Image,
   ScrollView,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { router } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
@@ -21,7 +20,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { GoogleSignInButton, isGoogleOAuthConfigured } from "../components/GoogleSignInSection";
 import { useAppTheme } from "../context/ThemeContext";
 import { useAlert } from "../context/AlertContext";
-import { API_URL, getBottomInset } from "../constants/config";
+import { API_URL } from "../constants/config";
+import { useAppInsets } from "../hooks/useAppInsets";
 import { authApi } from "../services/api";
 import { useAuthStore } from "../store/auth";
 import {
@@ -55,7 +55,7 @@ export default function LoginScreen() {
   const token = useAuthStore((s) => s.token);
   const user = useAuthStore((s) => s.user);
   const hasHydrated = useAuthStore((s) => s.hasHydrated);
-  const insets = useSafeAreaInsets();
+  const { top, bottom, contentColumnStyle } = useAppInsets();
   const { isDark } = useAppTheme();
   const alert = useAlert();
   const [mode, setMode] = useState<"signin" | "signup" | "forgot">("signin");
@@ -399,21 +399,20 @@ export default function LoginScreen() {
     }
   }
 
-  const scrollBottom = getBottomInset(insets.bottom);
-
   return (
-    <View style={[s.root, { backgroundColor: bg, paddingTop: insets.top }]}>
+    <View style={[s.root, { backgroundColor: bg, paddingTop: top }]}>
       <StatusBar style={isDark ? "light" : "dark"} />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={s.flex1}
-        keyboardVerticalOffset={Platform.OS === "ios" ? insets.top : 0}
+        keyboardVerticalOffset={Platform.OS === "ios" ? top : 0}
       >
         <ScrollView
           ref={scrollRef}
           contentContainerStyle={[
             s.scrollContent,
-            { paddingBottom: scrollBottom + 24 },
+            { paddingBottom: bottom + 24 },
+            contentColumnStyle,
           ]}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}

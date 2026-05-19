@@ -10,7 +10,7 @@ import { useAuthStore } from "../../store/auth";
 import { useBadgeStore } from "../../store/badges";
 import { CATEGORY_COLORS } from "../../constants/config";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { getBottomInset } from "../../constants/config";
+import { getBottomInset, getTopInset } from "../../constants/config";
 import { useAppTheme } from "../../context/ThemeContext";
 import { useAlert } from "../../context/AlertContext";
 
@@ -101,11 +101,11 @@ export default function PostDetailScreen() {
   }
 
   if (loading) {
-    return <View style={[s.center, { backgroundColor: bg, paddingTop: insets.top, paddingBottom: getBottomInset(insets.bottom) }]}><ActivityIndicator color={PRIMARY} size="large" /></View>;
+    return <View style={[s.center, { backgroundColor: bg, paddingTop: getTopInset(insets.top), paddingBottom: getBottomInset(insets.bottom) }]}><ActivityIndicator color={PRIMARY} size="large" /></View>;
   }
   if (!post) {
     return (
-      <View style={[s.center, { backgroundColor: bg, paddingTop: insets.top, paddingBottom: getBottomInset(insets.bottom) }]}>
+      <View style={[s.center, { backgroundColor: bg, paddingTop: getTopInset(insets.top), paddingBottom: getBottomInset(insets.bottom) }]}>
         <Ionicons name="warning-outline" size={48} color={sub} />
         <Text style={[s.emptyTitle, { color: text }]}>Post not found</Text>
         <TouchableOpacity onPress={() => router.back()} style={s.backCta}>
@@ -127,7 +127,7 @@ export default function PostDetailScreen() {
     <View style={{ flex: 1, backgroundColor: bg }}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 + getBottomInset(insets.bottom) }}>
         {/* ── Top bar ── */}
-        <View style={[s.topBar, { paddingTop: insets.top + 12 }]}>
+        <View style={[s.topBar, { paddingTop: getTopInset(insets.top) + 12 }]}>
           <TouchableOpacity onPress={() => router.back()} style={[s.backBtn, { backgroundColor: isDark ? "#1A1A1F" : "#F0F0F3" }]}>
             <Ionicons name="arrow-back" size={18} color={PRIMARY} />
           </TouchableOpacity>

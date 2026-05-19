@@ -12,7 +12,7 @@ import {
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { getBottomInset } from "../constants/config";
+import { getBottomInset, getTopInset } from "../constants/config";
 import { useAppTheme } from "../context/ThemeContext";
 import { useThemeStore } from "../store/theme";
 import { useAuthStore } from "../store/auth";
@@ -124,7 +124,7 @@ export default function SettingsScreen() {
       contentContainerStyle={{ paddingBottom: bottomPadding }}
       showsVerticalScrollIndicator={false}
     >
-      <View style={[s.header, { paddingTop: insets.top + 12, borderBottomColor: border }]}>
+      <View style={[s.header, { paddingTop: getTopInset(insets.top) + 12, borderBottomColor: border }]}>
         <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
           <Ionicons name="arrow-back" size={24} color={text} />
         </TouchableOpacity>
