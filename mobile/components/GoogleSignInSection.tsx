@@ -9,9 +9,13 @@ import {
   fetchDiscoveryAsync,
   makeRedirectUri,
 } from "expo-auth-session";
-import { Ionicons } from "@expo/vector-icons";
+import { GoogleGIcon } from "./GoogleGIcon";
 
 WebBrowser.maybeCompleteAuthSession();
+
+/** Shown when Google OAuth is unavailable — never expose DEVELOPER_ERROR / setup text to users. */
+export const GOOGLE_SIGNIN_UNAVAILABLE_MSG =
+  "Google sign-in is coming in the next update. Please use email sign-in for now.";
 
 export type GoogleOAuthExtra = {
   webClientId?: string;
@@ -32,28 +36,21 @@ export function isGoogleOAuthConfigured(): boolean {
   return true;
 }
 
-function isDeveloperError(e: unknown): boolean {
+function isSignInCancelled(e: unknown): boolean {
   const code = typeof e === "object" && e !== null && "code" in e ? String((e as { code?: string }).code) : "";
-  const msg = e instanceof Error ? e.message : String(e ?? "");
-  return code === "10" || /DEVELOPER_ERROR|developer console is not set up correctly/i.test(msg);
+  return code === "SIGN_IN_CANCELLED" || code === "12501";
 }
 
-function formatDeveloperError(): string {
-  return (
-    "Google Sign-In is not linked to this app install (SHA-1 mismatch).\n\n" +
-    "1. Firebase Console → Project settings → Your Android app (com.allconnect.app)\n" +
-    "2. Add SHA-1 from Play Console → Setup → App integrity → App signing key certificate\n" +
-    "3. Also add EAS upload keystore SHA-1: run in mobile/ → npx eas credentials -p android\n" +
-    "4. Download google-services.json into mobile/ and run a new EAS production build\n\n" +
-    "See mobile/GOOGLE_SIGNIN_SETUP.md for details."
-  );
+function notifyGoogleError(onError: ((message: string) => void) | undefined, e?: unknown) {
+  if (e && isSignInCancelled(e)) return;
+  onError?.(GOOGLE_SIGNIN_UNAVAILABLE_MSG);
 }
 
 function validateGoogleClientIds(extra: GoogleOAuthExtra | undefined): string | null {
   const web = extra?.webClientId?.trim() || "";
   const android = extra?.androidClientId?.trim() || "";
   if (web && android && web === android) {
-    return "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID must be the Web client ID from Firebase, not the Android client ID.";
+    return "misconfigured";
   }
   return null;
 }
@@ -75,7 +72,7 @@ function buildGoogleSignInConfig(extra: GoogleOAuthExtra | undefined) {
   return config;
 }
 
-/** Browser OAuth fallback (e.g. when native SDK hits DEVELOPER_ERROR on misconfigured SHA-1). */
+/** Browser OAuth fallback when native SDK fails. */
 async function signInWithGoogleBrowser(): Promise<string> {
   const extra = getGoogleExtra();
   const web = extra?.webClientId?.trim() || "";
@@ -89,7 +86,7 @@ async function signInWithGoogleBrowser(): Promise<string> {
         ? (ios && ios !== web ? ios : web)
         : web;
 
-  if (!clientId) throw new Error("Google Sign-In is not configured.");
+  if (!clientId) throw new Error("unavailable");
 
   const redirectUri = makeRedirectUri({ scheme: "allconnect" });
   const discovery = await fetchDiscoveryAsync("https://accounts.google.com");
@@ -105,13 +102,20 @@ async function signInWithGoogleBrowser(): Promise<string> {
     throw Object.assign(new Error("cancelled"), { code: "SIGN_IN_CANCELLED" });
   }
   if (result.type !== "success") {
-    throw new Error("Google sign-in was cancelled or failed.");
+    throw new Error("unavailable");
   }
   const idToken = typeof result.params?.id_token === "string" ? result.params.id_token : "";
-  if (!idToken) {
-    throw new Error("No ID token from Google. Check OAuth client and redirect URIs in Google Cloud Console.");
-  }
+  if (!idToken) throw new Error("unavailable");
   return idToken;
+}
+
+function GoogleSignInButtonContent({ textColor }: { textColor: string }) {
+  return (
+    <View style={styles.row}>
+      <GoogleGIcon size={22} />
+      <Text style={[styles.googleBtnText, { color: textColor, marginLeft: 10 }]}>Continue with Google</Text>
+    </View>
+  );
 }
 
 function GoogleSignInBrowser({
@@ -141,20 +145,14 @@ function GoogleSignInBrowser({
   useEffect(() => {
     if (!response) return;
     if (response.type === "error") {
-      const desc =
-        typeof response.params?.error_description === "string"
-          ? response.params.error_description
-          : typeof response.error?.message === "string"
-            ? response.error.message
-            : response.error?.toString?.() || "Google sign-in was cancelled or failed.";
-      onError?.(isDeveloperError({ message: desc }) ? formatDeveloperError() : desc);
+      notifyGoogleError(onError);
       return;
     }
     if (response.type !== "success") return;
     const idToken =
       typeof response.params?.id_token === "string" ? response.params.id_token : "";
     if (!idToken) {
-      onError?.("No ID token from Google. Check OAuth consent screen and redirect URIs in Google Cloud Console.");
+      notifyGoogleError(onError);
       return;
     }
     if (lastHandled.current === idToken) return;
@@ -167,19 +165,15 @@ function GoogleSignInBrowser({
       style={[styles.googleBtn, { borderColor, backgroundColor }]}
       disabled={!request || disabled}
       onPress={() => {
-        const configErr = validateGoogleClientIds(extra);
-        if (configErr) {
-          onError?.(configErr);
+        if (validateGoogleClientIds(extra)) {
+          notifyGoogleError(onError);
           return;
         }
-        void promptAsync().catch((e) => onError?.(e?.message || "Could not open Google sign-in."));
+        void promptAsync().catch((e) => notifyGoogleError(onError, e));
       }}
       activeOpacity={0.85}
     >
-      <View style={styles.row}>
-        <Ionicons name="logo-google" size={22} color="#4285F4" />
-        <Text style={[styles.googleBtnText, { color: textColor, marginLeft: 10 }]}>Continue with Google</Text>
-      </View>
+      <GoogleSignInButtonContent textColor={textColor} />
     </TouchableOpacity>
   );
 }
@@ -204,35 +198,26 @@ function GoogleSignInNative({
   useEffect(() => {
     const web = extra?.webClientId?.trim();
     if (!web || Constants.appOwnership === "expo") return;
-    const configErr = validateGoogleClientIds(extra);
-    if (configErr) {
-      onError?.(configErr);
-      return;
-    }
+    if (validateGoogleClientIds(extra)) return;
     let cancelled = false;
     void (async () => {
       try {
         const { GoogleSignin } = await import("@react-native-google-signin/google-signin");
         if (cancelled) return;
         GoogleSignin.configure(buildGoogleSignInConfig(extra));
-      } catch (e: unknown) {
-        if (!cancelled) onError?.(e instanceof Error ? e.message : "Google Sign-In configuration failed.");
+      } catch {
+        /* ignore — user sees friendly message only if sign-in fails */
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [extra?.webClientId, extra?.iosClientId, extra?.androidClientId, onError]);
+  }, [extra?.webClientId, extra?.iosClientId, extra?.androidClientId]);
 
   async function handlePress() {
     const web = extra?.webClientId?.trim();
-    if (!web) {
-      onError?.("Google Sign-In is not configured.");
-      return;
-    }
-    const configErr = validateGoogleClientIds(extra);
-    if (configErr) {
-      onError?.(configErr);
+    if (!web || validateGoogleClientIds(extra)) {
+      notifyGoogleError(onError);
       return;
     }
 
@@ -250,34 +235,22 @@ function GoogleSignInNative({
         idToken = tokens.idToken;
       }
       if (!idToken) {
-        onError?.(
-          "No ID token. Add your app SHA-1 in Firebase, use the Web client ID as EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID, and rebuild."
-        );
+        notifyGoogleError(onError);
         return;
       }
       onIdToken(idToken);
     } catch (e: unknown) {
-      const code = typeof e === "object" && e !== null && "code" in e ? String((e as { code?: string }).code) : "";
-      if (code === "SIGN_IN_CANCELLED" || code === "12501") return;
+      if (isSignInCancelled(e)) return;
 
-      if (isDeveloperError(e)) {
-        try {
-          const idToken = await signInWithGoogleBrowser();
-          onIdToken(idToken);
-          return;
-        } catch (fallbackErr: unknown) {
-          const fallbackCode =
-            typeof fallbackErr === "object" && fallbackErr !== null && "code" in fallbackErr
-              ? String((fallbackErr as { code?: string }).code)
-              : "";
-          if (fallbackCode === "SIGN_IN_CANCELLED") return;
-        }
-        onError?.(formatDeveloperError());
+      try {
+        const idToken = await signInWithGoogleBrowser();
+        onIdToken(idToken);
         return;
+      } catch (fallbackErr: unknown) {
+        if (isSignInCancelled(fallbackErr)) return;
       }
 
-      const msg = e instanceof Error ? e.message : "Google sign-in failed.";
-      onError?.(msg);
+      notifyGoogleError(onError, e);
     }
   }
 
@@ -288,10 +261,7 @@ function GoogleSignInNative({
       onPress={() => void handlePress()}
       activeOpacity={0.85}
     >
-      <View style={styles.row}>
-        <Ionicons name="logo-google" size={22} color="#4285F4" />
-        <Text style={[styles.googleBtnText, { color: textColor, marginLeft: 10 }]}>Continue with Google</Text>
-      </View>
+      <GoogleSignInButtonContent textColor={textColor} />
     </TouchableOpacity>
   );
 }
@@ -313,7 +283,6 @@ export function GoogleSignInButton({
   borderColor: string;
   backgroundColor: string;
   textColor: string;
-  /** Shown when the user-facing Google flow fails before onIdToken. */
   onError?: (message: string) => void;
 }) {
   const useBrowser = Platform.OS === "web" || Constants.appOwnership === "expo";

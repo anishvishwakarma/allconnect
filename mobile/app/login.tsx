@@ -17,7 +17,11 @@ import { router } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import type { User as FirebaseUser } from "firebase/auth";
 import { Ionicons } from "@expo/vector-icons";
-import { GoogleSignInButton, isGoogleOAuthConfigured } from "../components/GoogleSignInSection";
+import {
+  GoogleSignInButton,
+  GOOGLE_SIGNIN_UNAVAILABLE_MSG,
+  isGoogleOAuthConfigured,
+} from "../components/GoogleSignInSection";
 import { useAppTheme } from "../context/ThemeContext";
 import { useAlert } from "../context/AlertContext";
 import { API_URL } from "../constants/config";
@@ -308,7 +312,7 @@ export default function LoginScreen() {
             "info"
           );
         else if (msg.includes("invalid-credential") || msg.includes("Invalid or expired token"))
-          alert.show("Sign in failed", "Could not verify with Google. Try again.", undefined, "error");
+          alert.show("Google sign-in", GOOGLE_SIGNIN_UNAVAILABLE_MSG, undefined, "info");
         else if (msg.includes("Network") || msg.includes("Failed to fetch"))
           alert.show("Connection error", "Check your internet and try again.", undefined, "error");
         else if (msg.includes("Mobile number already"))
@@ -320,7 +324,7 @@ export default function LoginScreen() {
             undefined,
             "error"
           );
-        else alert.show("Google sign-in", msg, undefined, "error");
+        else alert.show("Google sign-in", GOOGLE_SIGNIN_UNAVAILABLE_MSG, undefined, "info");
       } finally {
         setLoading(false);
       }
@@ -673,7 +677,7 @@ export default function LoginScreen() {
                   borderColor={borderColor}
                   backgroundColor={inputBg}
                   textColor={textColor}
-                  onError={(msg) => alert.show("Google sign-in", msg, undefined, "error")}
+                  onError={(msg) => alert.show("Google sign-in", msg, undefined, "info")}
                 />
               </View>
             ) : null}

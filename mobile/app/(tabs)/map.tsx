@@ -21,9 +21,6 @@ const PRIMARY = "#E8751A";
 const PRIMARY_SOFT = "#FFF3E8";
 const AUTO_REFRESH_INTERVAL_MS = 45000;
 
-/** Map tab content already sits above the tab bar — do not add tabBarHeight to map overlays. */
-const MAP_EDGE_BOTTOM = 12;
-
 const CATEGORIES = ["activity","need","selling","meetup","event","study","nightlife","other"] as const;
 const WHEN_FILTERS = [
   { key: "today", label: "Today" },
@@ -284,7 +281,7 @@ function DraftMapMarker({
 }
 
 export default function MapScreen() {
-  const { top, left, right } = useAppInsets();
+  const { top, bottom, left, right, tabBarHeight } = useAppInsets();
   const token = useAuthStore((s) => s.token);
   const user = useAuthStore((s) => s.user);
   const { isDark } = useAppTheme();
@@ -552,7 +549,9 @@ export default function MapScreen() {
     ? resolveMarkerIconFromTitle(selectedPin.title, selectedPin.category)
     : "location";
 
-  const mapBottomPadding = selectedPin ? 200 : draftPin ? 96 : MAP_EDGE_BOTTOM;
+  /** Match pre–safe-area layout: Google logo sits just above tab bar; FAB uses bottom inset only. */
+  const mapBottomPadding = tabBarHeight;
+  const locateFabBottom = (selectedPin ? 220 : 100) + bottom;
 
   return (
     <View style={{ flex: 1, backgroundColor: bg }}>
@@ -561,7 +560,7 @@ export default function MapScreen() {
         ref={mapRef}
         provider={PROVIDER_GOOGLE}
         style={StyleSheet.absoluteFillObject}
-        mapPadding={{ bottom: mapBottomPadding, top, left, right }}
+        mapPadding={{ bottom: mapBottomPadding, top: 0, left: 0, right: 0 }}
         initialRegion={region}
         mapType="standard"
         onRegionChangeComplete={(r) => scheduleFetchForRegion(r, false)}
@@ -806,7 +805,7 @@ export default function MapScreen() {
       </View>
 
       {/* ── Location FAB (always visible so user can re-center; tap to go to current location) ── */}
-      <TouchableOpacity onPress={getLocation} disabled={locating} style={[s.fab, { backgroundColor: surface, borderColor: border, right: 20 + right, bottom: selectedPin ? 220 : 100 }]}>
+      <TouchableOpacity onPress={getLocation} disabled={locating} style={[s.fab, { backgroundColor: surface, borderColor: border, right: 20 + right, bottom: locateFabBottom }]}>
         {locating ? <ActivityIndicator size="small" color={PRIMARY} /> : <Ionicons name="locate-outline" size={20} color={PRIMARY} />}
       </TouchableOpacity>
 
@@ -820,7 +819,7 @@ export default function MapScreen() {
 
       {/* ── Pin detail card (above tab bar so View Details is fully visible) ── */}
       {selectedPin && (
-        <View style={[s.pinCard, { backgroundColor: surface, borderColor: border, bottom: MAP_EDGE_BOTTOM, left, right }]}>
+        <View style={[s.pinCard, { backgroundColor: surface, borderColor: border, bottom: tabBarHeight, left, right }]}>
           <View style={s.handle} />
           <View style={{ flexDirection: "row", alignItems: "flex-start", marginBottom: 12 }}>
             <View style={[s.pinTitleIconBox, { backgroundColor: selectedDetailCat + "24" }]}>
@@ -891,7 +890,7 @@ export default function MapScreen() {
         </View>
       )}
       {draftPin && !selectedPin && (
-        <View style={[s.draftCard, { backgroundColor: surface, borderColor: border, bottom: 88, marginHorizontal: Math.max(left, 16) }]}>
+        <View style={[s.draftCard, { backgroundColor: surface, borderColor: border, bottom: tabBarHeight + 80, marginHorizontal: Math.max(left, 16) }]}>
           <Text style={[s.draftTitle, { color: text }]}>Create post here?</Text>
           <Text style={[s.draftSub, { color: sub }]}>
             Long-pressed location on the map. You can fine-tune details on the next screen.
