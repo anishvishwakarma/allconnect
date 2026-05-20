@@ -52,6 +52,13 @@ export const INDIA_MOBILE_LENGTH = 10;
 /** Tab bar content height (excluding OS bottom inset). */
 export const TAB_BAR_CONTENT_HEIGHT = 56;
 
+/**
+ * Map tab: Google logo / locate FAB sit at the bottom of the map view.
+ * The tab bar is laid out below the map — do not add tabBarHeight here.
+ */
+export const MAP_UI_BOTTOM_GAP = 12;
+export const MAP_LOCATE_FAB_BOTTOM = 20;
+
 /** Max content width on tablets / wide phones — keeps forms readable, centered. */
 export const MAX_SCREEN_CONTENT_WIDTH = 720;
 

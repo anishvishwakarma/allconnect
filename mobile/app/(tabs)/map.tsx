@@ -14,7 +14,11 @@ import { useAuthStore } from "../../store/auth";
 import { postsApi, requestsApi, placesApi } from "../../services/api";
 import { useAppTheme } from "../../context/ThemeContext";
 import { useAlert } from "../../context/AlertContext";
-import { CATEGORY_COLORS } from "../../constants/config";
+import {
+  CATEGORY_COLORS,
+  MAP_LOCATE_FAB_BOTTOM,
+  MAP_UI_BOTTOM_GAP,
+} from "../../constants/config";
 import { useAppInsets } from "../../hooks/useAppInsets";
 
 const PRIMARY = "#E8751A";
@@ -281,7 +285,7 @@ function DraftMapMarker({
 }
 
 export default function MapScreen() {
-  const { top, bottom, left, right, tabBarHeight } = useAppInsets();
+  const { top, left, right } = useAppInsets();
   const token = useAuthStore((s) => s.token);
   const user = useAuthStore((s) => s.user);
   const { isDark } = useAppTheme();
@@ -549,9 +553,9 @@ export default function MapScreen() {
     ? resolveMarkerIconFromTitle(selectedPin.title, selectedPin.category)
     : "location";
 
-  /** Match pre–safe-area layout: Google logo sits just above tab bar; FAB uses bottom inset only. */
-  const mapBottomPadding = tabBarHeight;
-  const locateFabBottom = (selectedPin ? 220 : 100) + bottom;
+  /** Map view ends above tab bar — small bottom gap only (tabBarHeight would push controls too high). */
+  const mapBottomPadding = selectedPin ? 200 : draftPin ? 96 : MAP_UI_BOTTOM_GAP;
+  const locateFabBottom = selectedPin ? 220 : MAP_LOCATE_FAB_BOTTOM;
 
   return (
     <View style={{ flex: 1, backgroundColor: bg }}>
@@ -819,7 +823,7 @@ export default function MapScreen() {
 
       {/* ── Pin detail card (above tab bar so View Details is fully visible) ── */}
       {selectedPin && (
-        <View style={[s.pinCard, { backgroundColor: surface, borderColor: border, bottom: tabBarHeight, left, right }]}>
+        <View style={[s.pinCard, { backgroundColor: surface, borderColor: border, bottom: MAP_UI_BOTTOM_GAP, left, right }]}>
           <View style={s.handle} />
           <View style={{ flexDirection: "row", alignItems: "flex-start", marginBottom: 12 }}>
             <View style={[s.pinTitleIconBox, { backgroundColor: selectedDetailCat + "24" }]}>
@@ -890,7 +894,7 @@ export default function MapScreen() {
         </View>
       )}
       {draftPin && !selectedPin && (
-        <View style={[s.draftCard, { backgroundColor: surface, borderColor: border, bottom: tabBarHeight + 80, marginHorizontal: Math.max(left, 16) }]}>
+        <View style={[s.draftCard, { backgroundColor: surface, borderColor: border, bottom: 88, marginHorizontal: Math.max(left, 16) }]}>
           <Text style={[s.draftTitle, { color: text }]}>Create post here?</Text>
           <Text style={[s.draftSub, { color: sub }]}>
             Long-pressed location on the map. You can fine-tune details on the next screen.
