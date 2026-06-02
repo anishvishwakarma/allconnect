@@ -1,9 +1,9 @@
 import { useEffect } from "react";
 import { Tabs } from "expo-router";
-import { View, StyleSheet } from "react-native";
+import { View, StyleSheet, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { getBottomInset, TAB_BAR_CONTENT_HEIGHT } from "../../constants/config";
+import { TAB_BAR_CONTENT_HEIGHT, TAB_ITEM_LIFT_UP } from "../../constants/config";
+import { useAppInsets } from "../../hooks/useAppInsets";
 import { useAuthStore } from "../../store/auth";
 import { useBadgeStore } from "../../store/badges";
 import { getSocket } from "../../services/socket";
@@ -16,8 +16,14 @@ function tabBadge(n: number): string | undefined {
   return n > 99 ? "99+" : String(n);
 }
 
+/** Only the four side tabs — center + Post button keeps its own layout. */
+const sideTabLift = {
+  tabBarIconStyle: { marginTop: -TAB_ITEM_LIFT_UP },
+  tabBarLabelStyle: { marginTop: -1, marginBottom: 2 },
+};
+
 export default function TabsLayout() {
-  const insets = useSafeAreaInsets();
+  const { tabBarBottomPadding } = useAppInsets();
   const hasHydrated = useAuthStore((s) => s.hasHydrated);
   const token = useAuthStore((s) => s.token);
   const chatUnread = useBadgeStore((s) => s.chat_unread);
@@ -45,6 +51,8 @@ export default function TabsLayout() {
   const border = isDark ? "#1E1E21" : "#E5E5EA";
   const inactive = isDark ? "#505055" : "#AEAEB2";
 
+  const tabBarHeight = TAB_BAR_CONTENT_HEIGHT + tabBarBottomPadding;
+
   return (
     <Tabs
       screenOptions={{
@@ -55,17 +63,20 @@ export default function TabsLayout() {
           backgroundColor: bg,
           borderTopColor: border,
           borderTopWidth: StyleSheet.hairlineWidth,
-          height: TAB_BAR_CONTENT_HEIGHT + getBottomInset(insets.bottom),
-          paddingBottom: getBottomInset(insets.bottom),
+          height: tabBarHeight,
+          paddingBottom: tabBarBottomPadding,
           paddingTop: 10,
-          elevation: 0,
-          shadowOpacity: 0,
+          elevation: 8,
+          shadowOpacity: Platform.OS === "ios" ? 0.08 : 0,
+          shadowOffset: { width: 0, height: -2 },
+          shadowRadius: 4,
         },
         tabBarLabelStyle: {
           fontSize: 10,
           fontWeight: "600",
           letterSpacing: 0.2,
           marginTop: 2,
+          marginBottom: 0,
         },
         tabBarBadgeStyle: {
           backgroundColor: PRIMARY,
@@ -79,6 +90,7 @@ export default function TabsLayout() {
         name="map"
         options={{
           title: "Explore",
+          ...sideTabLift,
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "map" : "map-outline"} size={22} color={color} />
           ),
@@ -88,6 +100,7 @@ export default function TabsLayout() {
         name="history"
         options={{
           title: "History",
+          ...sideTabLift,
           tabBarBadge: tabBadge(historyPending),
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "time" : "time-outline"} size={22} color={color} />
@@ -117,6 +130,7 @@ export default function TabsLayout() {
         name="chats"
         options={{
           title: "Chats",
+          ...sideTabLift,
           tabBarBadge: tabBadge(chatUnread),
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "chatbubbles" : "chatbubbles-outline"} size={22} color={color} />
@@ -133,6 +147,7 @@ export default function TabsLayout() {
         name="profile"
         options={{
           title: "Profile",
+          ...sideTabLift,
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "person-circle" : "person-circle-outline"} size={24} color={color} />
           ),

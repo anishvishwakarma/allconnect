@@ -52,6 +52,12 @@ export const INDIA_MOBILE_LENGTH = 10;
 /** Tab bar content height (excluding OS bottom inset). */
 export const TAB_BAR_CONTENT_HEIGHT = 56;
 
+/** Extra lift so tab labels/icons sit above system nav (gesture bar / 3-button bar). */
+export const TAB_BAR_EXTRA_BOTTOM = 10;
+
+/** Nudge Explore/History/Chats/Profile up slightly inside the bar (does not affect center + button). */
+export const TAB_ITEM_LIFT_UP = 3;
+
 /**
  * Map tab: Google logo / locate FAB sit at the bottom of the map view.
  * The tab bar is laid out below the map — do not add tabBarHeight here.
@@ -106,8 +112,27 @@ export function screenSafePadding(
   };
 }
 
+/**
+ * Bottom padding for the tab bar only. Play Store / edge-to-edge Android often reports
+ * insets.bottom === 0; use a taller fallback so Explore/History/Chats/Profile clear system UI.
+ */
+export function getTabBarBottomInset(bottom: number): number {
+  const raw = Math.max(0, bottom);
+  let inset: number;
+  if (raw > 0) {
+    inset = Math.max(raw, Platform.OS === "android" ? 16 : 10);
+  } else if (Platform.OS === "android") {
+    inset = 48;
+  } else if (Platform.OS === "ios") {
+    inset = 20;
+  } else {
+    inset = 0;
+  }
+  return inset + TAB_BAR_EXTRA_BOTTOM;
+}
+
 export function tabBarTotalHeight(bottomInset: number): number {
-  return TAB_BAR_CONTENT_HEIGHT + getBottomInset(bottomInset);
+  return TAB_BAR_CONTENT_HEIGHT + getTabBarBottomInset(bottomInset);
 }
 
 /** Public privacy policy URL (required for store listings; also used in-app for "View full policy"). */

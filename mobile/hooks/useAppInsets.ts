@@ -3,6 +3,7 @@ import { initialWindowMetrics, useSafeAreaInsets } from "react-native-safe-area-
 import {
   getTopInset,
   getBottomInset,
+  getTabBarBottomInset,
   getHorizontalInsets,
   TAB_BAR_CONTENT_HEIGHT,
   MAX_SCREEN_CONTENT_WIDTH,
@@ -33,7 +34,8 @@ export function useAppInsets() {
   const top = getTopInset(raw.top);
   const bottom = getBottomInset(raw.bottom);
   const { left, right } = getHorizontalInsets(raw.left, raw.right);
-  const tabBarHeight = tabBarTotalHeight(raw.bottom);
+  const tabBarBottomPadding = getTabBarBottomInset(raw.bottom);
+  const tabBarHeight = TAB_BAR_CONTENT_HEIGHT + tabBarBottomPadding;
   const isWideLayout = width >= 600;
 
   return {
@@ -43,6 +45,7 @@ export function useAppInsets() {
     left,
     right,
     tabBarHeight,
+    tabBarBottomPadding,
     tabBarContentHeight: TAB_BAR_CONTENT_HEIGHT,
     isWideLayout,
     /** Centered column on tablets — use on ScrollView contentContainerStyle */

@@ -82,7 +82,8 @@ module.exports = {
       google,
     },
     slug: "allconnect",
-    version: "1.1.2",
+    owner: "allpixel-technologies-main",
+    version: "1.1.3",
     orientation: "portrait",
     icon: "./assets/icon.png",
     userInterfaceStyle: "automatic",
@@ -95,7 +96,7 @@ module.exports = {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.allconnect.app",
-      buildNumber: "4",
+      buildNumber: "5",
       config: { googleMapsApiKey: mapsApiKeyIos },
       infoPlist: {
         NSPhotoLibraryUsageDescription: "AllConnect needs photo access to set your profile picture.",
@@ -109,7 +110,7 @@ module.exports = {
         backgroundColor: "#E8751A",
       },
       package: "com.allconnect.app",
-      versionCode: 4,
+      versionCode: 5,
       /** Lets the window shrink when the keyboard opens so ScrollView can reach password / buttons. */
       softwareKeyboardLayoutMode: "resize",
       config: {
@@ -117,7 +118,12 @@ module.exports = {
       },
     },
     plugins: [
-      "expo-updates",
+      [
+        "expo-updates",
+        {
+          enabled: false,
+        },
+      ],
       "expo-router",
       [
         "expo-location",

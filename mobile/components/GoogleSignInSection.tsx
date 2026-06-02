@@ -27,6 +27,42 @@ function getGoogleExtra(): GoogleOAuthExtra | undefined {
   return Constants.expoConfig?.extra?.google as GoogleOAuthExtra | undefined;
 }
 
+function isExpoGo(): boolean {
+  return Constants.appOwnership === "expo";
+}
+
+/** Expo Go cannot use exp:// redirects — Google requires https://auth.expo.io/@owner/slug on the Web OAuth client. */
+function getGoogleOAuthRedirectUri(): string {
+  if (!isExpoGo()) {
+    return makeRedirectUri({ scheme: "allconnect" });
+  }
+  const fullName = Constants.expoConfig?.originalFullName;
+  if (fullName) {
+    return `https://auth.expo.io/${fullName.startsWith("@") ? fullName : `@${fullName}`}`;
+  }
+  const owner = Constants.expoConfig?.owner ?? "allpixel-technologies-main";
+  const slug = Constants.expoConfig?.slug ?? "allconnect";
+  return `https://auth.expo.io/@${owner}/${slug}`;
+}
+
+/** Expo Go must use the Web client ID (Android/iOS client IDs reject auth.expo.io redirect). */
+function googleAuthRequestConfig(extra: GoogleOAuthExtra | undefined) {
+  const web = extra?.webClientId?.trim() || "";
+  if (isExpoGo()) {
+    return {
+      webClientId: web,
+      iosClientId: web,
+      androidClientId: web,
+      redirectUri: getGoogleOAuthRedirectUri(),
+    };
+  }
+  return {
+    webClientId: web,
+    iosClientId: extra?.iosClientId?.trim() || "",
+    androidClientId: extra?.androidClientId?.trim() || "",
+  };
+}
+
 /** Web / Expo Go: browser OAuth. Production native builds: @react-native-google-signin (Play Services / iOS SDK). */
 export function isGoogleOAuthConfigured(): boolean {
   const g = getGoogleExtra();
@@ -88,7 +124,7 @@ async function signInWithGoogleBrowser(): Promise<string> {
 
   if (!clientId) throw new Error("unavailable");
 
-  const redirectUri = makeRedirectUri({ scheme: "allconnect" });
+  const redirectUri = getGoogleOAuthRedirectUri();
   const discovery = await fetchDiscoveryAsync("https://accounts.google.com");
   const request = new AuthRequest({
     clientId,
@@ -136,11 +172,7 @@ function GoogleSignInBrowser({
   const extra = getGoogleExtra();
   const lastHandled = useRef<string | null>(null);
 
-  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
-    webClientId: extra?.webClientId || "",
-    iosClientId: extra?.iosClientId || "",
-    androidClientId: extra?.androidClientId || "",
-  });
+  const [request, response, promptAsync] = Google.useIdTokenAuthRequest(googleAuthRequestConfig(extra));
 
   useEffect(() => {
     if (!response) return;
