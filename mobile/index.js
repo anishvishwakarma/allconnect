@@ -17,4 +17,13 @@ if (typeof global !== "undefined" && global.ErrorUtils?.getGlobalHandler) {
   });
 }
 
+try {
+  const { LogBox } = require("react-native");
+  LogBox.ignoreLogs([
+    /expo-notifications.*Expo Go/i,
+    /expo-notifications.*SDK 53/i,
+    /Android Push notifications \(remote notifications\)/i,
+  ]);
+} catch (_) {}
+
 require("expo-router/entry");

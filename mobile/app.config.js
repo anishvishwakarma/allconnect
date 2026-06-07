@@ -7,6 +7,14 @@ try {
 
 const googleServicesFile = path.resolve(__dirname, 'google-services.json');
 const hasGoogleServices = fs.existsSync(googleServicesFile);
+/** EAS file env: upload google-services.json as GOOGLE_SERVICES_JSON (type file) for cloud builds. */
+const easGoogleServices = process.env.GOOGLE_SERVICES_JSON?.trim();
+const resolvedGoogleServicesFile =
+  easGoogleServices && fs.existsSync(easGoogleServices)
+    ? easGoogleServices
+    : hasGoogleServices
+      ? './google-services.json'
+      : null;
 
 // Single key (Expo Go + fallback), or use platform-specific keys for EAS builds
 const mapsApiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || "";
@@ -83,8 +91,9 @@ module.exports = {
     },
     slug: "allconnect",
     owner: "allpixel-technologies-main",
-    version: "1.1.3",
-    orientation: "portrait",
+    version: "1.1.4",
+    /** Default on Android (Play large-screen policy); iOS portrait via infoPlist + runtime lock. */
+    orientation: "default",
     icon: "./assets/icon.png",
     userInterfaceStyle: "automatic",
     scheme: "allconnect",
@@ -96,21 +105,23 @@ module.exports = {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.allconnect.app",
-      buildNumber: "5",
+      buildNumber: "6",
       config: { googleMapsApiKey: mapsApiKeyIos },
       infoPlist: {
         NSPhotoLibraryUsageDescription: "AllConnect needs photo access to set your profile picture.",
         NSLocationWhenInUseUsageDescription: "AllConnect uses your location to show nearby events and add your post location on the map.",
+        UISupportedInterfaceOrientations: ["UIInterfaceOrientationPortrait"],
+        "UISupportedInterfaceOrientations~ipad": ["UIInterfaceOrientationPortrait"],
       },
     },
     android: {
-      ...(hasGoogleServices ? { googleServicesFile: "./google-services.json" } : {}),
+      ...(resolvedGoogleServicesFile ? { googleServicesFile: resolvedGoogleServicesFile } : {}),
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#E8751A",
       },
       package: "com.allconnect.app",
-      versionCode: 5,
+      versionCode: 6,
       /** Lets the window shrink when the keyboard opens so ScrollView can reach password / buttons. */
       softwareKeyboardLayoutMode: "resize",
       config: {
@@ -118,6 +129,15 @@ module.exports = {
       },
     },
     plugins: [
+      [
+        "expo-build-properties",
+        {
+          android: {
+            useDayNightTheme: true,
+          },
+        },
+      ],
+      "expo-screen-orientation",
       [
         "expo-updates",
         {

@@ -1,28 +1,54 @@
 /**
  * Expo Push Notifications — register device token with backend.
+ * Lazy-loads expo-notifications so Expo Go (SDK 53+) never triggers push warnings on import.
  */
-import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
+import { isExpoGo } from '../constants/config';
 import { usersApi } from './api';
 import { API_URL } from '../constants/config';
 
 const PUSH_TOKEN_CACHE_KEY = 'allconnect:push-token';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+type NotificationsModule = typeof import('expo-notifications');
+
+async function getNotifications(): Promise<NotificationsModule | null> {
+  if (isExpoGo()) return null;
+  try {
+    return await import('expo-notifications');
+  } catch {
+    return null;
+  }
+}
+
+let handlerConfigured = false;
+
+async function ensureNotificationHandler(Notifications: NotificationsModule): Promise<void> {
+  if (handlerConfigured) return;
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+  handlerConfigured = true;
+}
 
 export async function registerForPushNotificationsAsync(): Promise<string | null> {
+  if (isExpoGo()) return null;
+
+  const Notifications = await getNotifications();
+  if (!Notifications) return null;
+
+  const Device = await import('expo-device');
   if (!Device.isDevice) return null;
+
+  await ensureNotificationHandler(Notifications);
+
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('default', {
       name: 'default',
@@ -46,6 +72,7 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
 }
 
 export async function registerPushTokenWithBackend(): Promise<void> {
+  if (isExpoGo()) return;
   const token = await registerForPushNotificationsAsync();
   if (!token) return;
   try {
@@ -57,6 +84,7 @@ export async function registerPushTokenWithBackend(): Promise<void> {
 }
 
 export async function unregisterPushTokenWithBackend(authToken?: string | null): Promise<void> {
+  if (isExpoGo()) return;
   try {
     const token = await AsyncStorage.getItem(PUSH_TOKEN_CACHE_KEY);
     if (!token) return;

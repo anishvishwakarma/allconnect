@@ -3,12 +3,8 @@ import { TouchableOpacity, Text, StyleSheet, Platform, View } from "react-native
 import Constants from "expo-constants";
 import * as WebBrowser from "expo-web-browser";
 import * as Google from "expo-auth-session/providers/google";
-import {
-  AuthRequest,
-  ResponseType,
-  fetchDiscoveryAsync,
-  makeRedirectUri,
-} from "expo-auth-session";
+import { makeRedirectUri } from "expo-auth-session";
+import { isExpoGo } from "../constants/config";
 import { GoogleGIcon } from "./GoogleGIcon";
 
 WebBrowser.maybeCompleteAuthSession();
@@ -27,10 +23,6 @@ function getGoogleExtra(): GoogleOAuthExtra | undefined {
   return Constants.expoConfig?.extra?.google as GoogleOAuthExtra | undefined;
 }
 
-function isExpoGo(): boolean {
-  return Constants.appOwnership === "expo";
-}
-
 /** Expo Go cannot use exp:// redirects — Google requires https://auth.expo.io/@owner/slug on the Web OAuth client. */
 function getGoogleOAuthRedirectUri(): string {
   if (!isExpoGo()) {
@@ -45,28 +37,22 @@ function getGoogleOAuthRedirectUri(): string {
   return `https://auth.expo.io/@${owner}/${slug}`;
 }
 
-/** Expo Go must use the Web client ID (Android/iOS client IDs reject auth.expo.io redirect). */
+/** Web only — Expo Go cannot use browser Google OAuth reliably (redirect_uri_mismatch). */
 function googleAuthRequestConfig(extra: GoogleOAuthExtra | undefined) {
   const web = extra?.webClientId?.trim() || "";
-  if (isExpoGo()) {
-    return {
-      webClientId: web,
-      iosClientId: web,
-      androidClientId: web,
-      redirectUri: getGoogleOAuthRedirectUri(),
-    };
-  }
   return {
     webClientId: web,
-    iosClientId: extra?.iosClientId?.trim() || "",
-    androidClientId: extra?.androidClientId?.trim() || "",
+    iosClientId: web,
+    androidClientId: web,
+    redirectUri: getGoogleOAuthRedirectUri(),
   };
 }
 
-/** Web / Expo Go: browser OAuth. Production native builds: @react-native-google-signin (Play Services / iOS SDK). */
+/** Show Google button when web client ID exists. Expo Go shows friendly message on tap (no browser). */
 export function isGoogleOAuthConfigured(): boolean {
   const g = getGoogleExtra();
   if (!g?.webClientId?.trim()) return false;
+  if (isExpoGo()) return true;
   if (Platform.OS === "web") return true;
   if (Platform.OS === "ios") return !!g.iosClientId?.trim();
   return true;
@@ -108,49 +94,38 @@ function buildGoogleSignInConfig(extra: GoogleOAuthExtra | undefined) {
   return config;
 }
 
-/** Browser OAuth fallback when native SDK fails. */
-async function signInWithGoogleBrowser(): Promise<string> {
-  const extra = getGoogleExtra();
-  const web = extra?.webClientId?.trim() || "";
-  const android = extra?.androidClientId?.trim() || "";
-  const ios = extra?.iosClientId?.trim() || "";
-
-  const clientId =
-    Platform.OS === "android"
-      ? android || web
-      : Platform.OS === "ios"
-        ? (ios && ios !== web ? ios : web)
-        : web;
-
-  if (!clientId) throw new Error("unavailable");
-
-  const redirectUri = getGoogleOAuthRedirectUri();
-  const discovery = await fetchDiscoveryAsync("https://accounts.google.com");
-  const request = new AuthRequest({
-    clientId,
-    scopes: ["openid", "profile", "email"],
-    redirectUri,
-    responseType: ResponseType.IdToken,
-  });
-
-  const result = await request.promptAsync(discovery);
-  if (result.type === "cancel" || result.type === "dismiss") {
-    throw Object.assign(new Error("cancelled"), { code: "SIGN_IN_CANCELLED" });
-  }
-  if (result.type !== "success") {
-    throw new Error("unavailable");
-  }
-  const idToken = typeof result.params?.id_token === "string" ? result.params.id_token : "";
-  if (!idToken) throw new Error("unavailable");
-  return idToken;
-}
-
 function GoogleSignInButtonContent({ textColor }: { textColor: string }) {
   return (
     <View style={styles.row}>
       <GoogleGIcon size={22} />
       <Text style={[styles.googleBtnText, { color: textColor, marginLeft: 10 }]}>Continue with Google</Text>
     </View>
+  );
+}
+
+/** Expo Go: show button but never open Google browser (redirect_uri_mismatch). */
+function GoogleSignInExpoGoPlaceholder({
+  disabled,
+  borderColor,
+  backgroundColor,
+  textColor,
+  onError,
+}: {
+  disabled?: boolean;
+  borderColor: string;
+  backgroundColor: string;
+  textColor: string;
+  onError?: (message: string) => void;
+}) {
+  return (
+    <TouchableOpacity
+      style={[styles.googleBtn, { borderColor, backgroundColor }]}
+      disabled={disabled}
+      onPress={() => notifyGoogleError(onError)}
+      activeOpacity={0.85}
+    >
+      <GoogleSignInButtonContent textColor={textColor} />
+    </TouchableOpacity>
   );
 }
 
@@ -229,7 +204,7 @@ function GoogleSignInNative({
 
   useEffect(() => {
     const web = extra?.webClientId?.trim();
-    if (!web || Constants.appOwnership === "expo") return;
+    if (!web || isExpoGo()) return;
     if (validateGoogleClientIds(extra)) return;
     let cancelled = false;
     void (async () => {
@@ -273,15 +248,6 @@ function GoogleSignInNative({
       onIdToken(idToken);
     } catch (e: unknown) {
       if (isSignInCancelled(e)) return;
-
-      try {
-        const idToken = await signInWithGoogleBrowser();
-        onIdToken(idToken);
-        return;
-      } catch (fallbackErr: unknown) {
-        if (isSignInCancelled(fallbackErr)) return;
-      }
-
       notifyGoogleError(onError, e);
     }
   }
@@ -299,8 +265,8 @@ function GoogleSignInNative({
 }
 
 /**
- * Native production builds use Google Play / iOS SDK (reliable with Firebase).
- * Expo Go and web keep expo-auth-session (may hit OAuth browser restrictions).
+ * Expo Go: friendly in-app message only (no Google browser).
+ * Web: browser OAuth. Production: native Google Play / iOS SDK.
  */
 export function GoogleSignInButton({
   onIdToken,
@@ -317,8 +283,18 @@ export function GoogleSignInButton({
   textColor: string;
   onError?: (message: string) => void;
 }) {
-  const useBrowser = Platform.OS === "web" || Constants.appOwnership === "expo";
-  if (useBrowser) {
+  if (isExpoGo()) {
+    return (
+      <GoogleSignInExpoGoPlaceholder
+        disabled={disabled}
+        borderColor={borderColor}
+        backgroundColor={backgroundColor}
+        textColor={textColor}
+        onError={onError}
+      />
+    );
+  }
+  if (Platform.OS === "web") {
     return (
       <GoogleSignInBrowser
         onIdToken={onIdToken}

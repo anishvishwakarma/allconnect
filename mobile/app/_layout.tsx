@@ -1,22 +1,27 @@
 import { useEffect } from "react";
 import { Stack, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import Constants from "expo-constants";
+import * as ScreenOrientation from "expo-screen-orientation";
 import { SafeAreaProvider, initialWindowMetrics } from "react-native-safe-area-context";
 import { ThemeProvider, useAppTheme } from "../context/ThemeContext";
 import { AlertProvider } from "../context/AlertContext";
 import { useAuthStore } from "../store/auth";
 import { useAppUpdateCheck } from "../hooks/useAppUpdateCheck";
+import { isExpoGo } from "../constants/config";
 
 function RootStack() {
   const token = useAuthStore((s) => s.token);
   const hasHydrated = useAuthStore((s) => s.hasHydrated);
   useAppUpdateCheck();
 
+  /** Portrait on phones without android:screenOrientation=PORTRAIT in manifest (Play Console policy). */
+  useEffect(() => {
+    void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
+  }, []);
+
   useEffect(() => {
     if (!hasHydrated) return;
-    // Skip in Expo Go — push notifications removed in SDK 53; avoids "expo-notifications" console error
-    if (Constants.appOwnership === "expo") return;
+    if (isExpoGo()) return;
 
     function navigateFromNotification(data: Record<string, unknown> | undefined) {
       if (!token) return;
@@ -55,8 +60,7 @@ function RootStack() {
 
   useEffect(() => {
     if (!hasHydrated || !token) return;
-    // Push notifications not supported in Expo Go (SDK 53+)
-    if (Constants.appOwnership === "expo") return;
+    if (isExpoGo()) return;
     import("../services/pushNotifications")
       .then((m) => m.registerForPushNotifications())
       .catch(() => {});

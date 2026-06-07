@@ -2,7 +2,7 @@
 # Usage (from mobile/): .\scripts\set-eas-secrets.ps1
 # Requires: npx eas-cli logged in
 
-$envFile = Join-Path $PSScriptRoot ".." ".env"
+$envFile = Join-Path (Join-Path $PSScriptRoot "..") ".env"
 if (-not (Test-Path $envFile)) {
   Write-Error ".env not found at $envFile"
   exit 1
@@ -35,7 +35,7 @@ Get-Content $envFile | ForEach-Object {
     if ($name -in $vars -and $value -and $value -notmatch '^YOUR_|^<\w+>$') {
       foreach ($envName in $environments) {
         Write-Host "EAS env: $name -> $envName"
-        & npx eas-cli env:create `
+        & npx --yes eas-cli@latest env:create `
           --name $name `
           --value $value `
           --environment $envName `

@@ -1,4 +1,13 @@
 import { Platform } from "react-native";
+import Constants from "expo-constants";
+
+/** True when running inside the Expo Go app (not a store/dev/production build). */
+export function isExpoGo(): boolean {
+  return (
+    Constants.appOwnership === "expo" ||
+    Constants.executionEnvironment === "storeClient"
+  );
+}
 
 /** REST + Socket base URL. Set EXPO_PUBLIC_API_URL in .env. Default: production (localhost only works when running backend locally) */
 export const API_URL =
