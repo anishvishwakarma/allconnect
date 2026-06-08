@@ -58,8 +58,15 @@ export interface Message {
   id: string;
   user_id: string;
   user_name?: string | null;
+  user_avatar_uri?: string | null;
   body: string;
   created_at: string;
+}
+
+export interface ChatMember {
+  id: string;
+  name?: string | null;
+  avatar_uri?: string | null;
 }
 
 export interface AppNotification {

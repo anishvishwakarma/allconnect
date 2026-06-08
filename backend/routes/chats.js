@@ -28,14 +28,27 @@ function groupRowToJson(r) {
   };
 }
 
-function messageRowToJson(r) {
+function messageRowToJson(r, { includeProfile = false } = {}) {
   if (!r) return null;
-  return {
+  const out = {
     id: r.id,
     user_id: r.user_id,
     user_name: r.user_name || null,
     body: r.body,
     created_at: r.created_at,
+  };
+  if (includeProfile) {
+    out.user_avatar_uri = r.user_avatar_uri || null;
+  }
+  return out;
+}
+
+function memberRowToJson(r) {
+  if (!r) return null;
+  return {
+    id: r.id,
+    name: r.name || null,
+    avatar_uri: r.avatar_uri || null,
   };
 }
 
@@ -65,6 +78,41 @@ router.get('/groups', authMiddleware, async (req, res) => {
   }
 });
 
+// GET /api/chats/groups/:groupId/members — profiles visible only while chat is live
+router.get('/groups/:groupId/members', authMiddleware, async (req, res) => {
+  try {
+    const groupId = req.params.groupId;
+    const member = await db.row(
+      'SELECT 1 FROM group_chat_members WHERE group_chat_id = $1 AND user_id = $2',
+      [groupId, req.userId]
+    );
+    if (!member) return res.status(403).json({ error: 'Not a member of this chat' });
+    const group = await db.row('SELECT expires_at FROM group_chats WHERE id = $1', [groupId]);
+    if (!group) return res.status(404).json({ error: 'Chat not found' });
+    const expired = new Date(group.expires_at) < new Date();
+    if (expired) {
+      return res.json({ expired: true, members: [] });
+    }
+    const rows = await db.rows(
+      `SELECT u.id, u.name, u.avatar_uri
+       FROM group_chat_members gcm
+       INNER JOIN users u ON u.id = gcm.user_id
+       WHERE gcm.group_chat_id = $1
+       ORDER BY (u.id = (
+         SELECT host_id FROM posts p
+         INNER JOIN group_chats gc ON gc.post_id = p.id
+         WHERE gc.id = $1
+         LIMIT 1
+       )) DESC, u.name ASC NULLS LAST, u.id ASC`,
+      [groupId]
+    );
+    return res.json({ expired: false, members: rows.map(memberRowToJson) });
+  } catch (err) {
+    console.error('chats/members', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // GET /api/chats/groups/:groupId/messages (allowed when chat expired — read-only)
 router.get('/groups/:groupId/messages', authMiddleware, async (req, res) => {
   try {
@@ -78,20 +126,23 @@ router.get('/groups/:groupId/messages', authMiddleware, async (req, res) => {
     const group = await db.row('SELECT expires_at FROM group_chats WHERE id = $1', [groupId]);
     if (!group) return res.status(404).json({ error: 'Chat not found' });
     // Allow loading messages for expired chats so users can read history (POST still blocks sending)
+    const expired = new Date(group.expires_at) < new Date();
     const rows = await db.rows(
-      `SELECT m.*, u.name AS user_name
+      `SELECT m.*, u.name AS user_name, u.avatar_uri AS user_avatar_uri
        FROM messages m
        LEFT JOIN users u ON u.id = m.user_id
        WHERE m.group_chat_id = $1
        ORDER BY m.created_at ASC`,
       [groupId]
     );
-    const expired = new Date(group.expires_at) < new Date();
     await db.query(
       'UPDATE group_chat_members SET last_read_at = NOW() WHERE group_chat_id = $1 AND user_id = $2',
       [groupId, req.userId]
     );
-    return res.json({ messages: rows.map(messageRowToJson), expired });
+    return res.json({
+      messages: rows.map((r) => messageRowToJson(r, { includeProfile: !expired })),
+      expired,
+    });
   } catch (err) {
     console.error('chats/messages', err);
     return res.status(500).json({ error: 'Server error' });
@@ -120,13 +171,13 @@ router.post('/groups/:groupId/messages', authMiddleware, rateLimitChatMessage, a
       [id, groupId, req.userId, body]
     );
     const msg = await db.row(
-      `SELECT m.*, u.name AS user_name
+      `SELECT m.*, u.name AS user_name, u.avatar_uri AS user_avatar_uri
        FROM messages m
        LEFT JOIN users u ON u.id = m.user_id
        WHERE m.id = $1`,
       [id]
     );
-    const msgJson = messageRowToJson(msg);
+    const msgJson = messageRowToJson(msg, { includeProfile: true });
     req.app.emit('chat:new_message', { groupId, message: msgJson });
     return res.json(msgJson);
   } catch (err) {

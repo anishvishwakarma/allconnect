@@ -163,6 +163,9 @@ router.post('/request', authMiddleware, rateLimitRequestWrites, async (req, res)
       }
 
       await client.query('COMMIT');
+      if (groupChat?.id) {
+        req.app.emit('chat:members_updated', { groupId: groupChat.id });
+      }
       return res.json({ success: true, status: 'approved', group_chat_id: groupChat?.id || null });
     } catch (err) {
       await client.query('ROLLBACK');
@@ -300,6 +303,9 @@ router.post('/approve', authMiddleware, rateLimitRequestWrites, async (req, res)
           groupId: gc?.id ? String(gc.id) : '',
         },
       }).catch((e) => console.error('Push on approve:', e));
+      if (gc?.id) {
+        req.app.emit('chat:members_updated', { groupId: gc.id });
+      }
       return res.json({ success: true, group_chat_id: gc?.id || null });
     } catch (err) {
       await client.query('ROLLBACK');

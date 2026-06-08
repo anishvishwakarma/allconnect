@@ -131,6 +131,10 @@ io.on('connection', (socket) => {
   });
 });
 
+app.on('chat:members_updated', ({ groupId }) => {
+  if (groupId) io.to(`chat:${groupId}`).emit('chat:members_updated');
+});
+
 app.on('chat:new_message', ({ groupId, message }) => {
   void (async () => {
     try {

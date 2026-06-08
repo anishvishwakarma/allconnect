@@ -8,7 +8,7 @@ import MapView, { Marker, PROVIDER_GOOGLE, MapMarkerProps } from "react-native-m
 // Workaround: react-native-maps types omit React's built-in `key` prop
 const AnyMarker = Marker as React.ComponentType<MapMarkerProps & { key?: React.Key; children?: React.ReactNode }>;
 import * as Location from "expo-location";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuthStore } from "../../store/auth";
 import { postsApi, requestsApi, placesApi } from "../../services/api";
@@ -20,6 +20,7 @@ import {
   MAP_UI_BOTTOM_GAP,
 } from "../../constants/config";
 import { useAppInsets } from "../../hooks/useAppInsets";
+import type { JoinRequest } from "../../types";
 
 const PRIMARY = "#E8751A";
 const PRIMARY_SOFT = "#FFF3E8";
@@ -298,7 +299,9 @@ export default function MapScreen() {
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationGranted, setLocationGranted] = useState(false);
   const [reqLoading, setReqLoading] = useState(false);
-  const [reqDone, setReqDone] = useState(false);
+  const [myRequest, setMyRequest] = useState<JoinRequest | null>(null);
+  const [myRequestLoading, setMyRequestLoading] = useState(false);
+  const myRequestCacheRef = useRef<Map<string, JoinRequest | null>>(new Map());
   const [mapLoadError, setMapLoadError] = useState(false);
   const [mapReady, setMapReady] = useState(false);
   const [mapKey, setMapKey] = useState(0);
@@ -455,12 +458,73 @@ export default function MapScreen() {
       .catch(() => {});
   }, []);
 
+  const loadMyRequestForPin = useCallback(async (postId: string) => {
+    if (!token) {
+      setMyRequest(null);
+      setMyRequestLoading(false);
+      return;
+    }
+    try {
+      const req = await requestsApi.myRequest(postId);
+      const val = req ?? null;
+      myRequestCacheRef.current.set(postId, val);
+      setMyRequest(val);
+    } catch {
+      // Keep cached/visible state on network error — avoid flashing "Request to Join" again.
+      const cached = myRequestCacheRef.current.get(postId);
+      if (cached !== undefined) setMyRequest(cached);
+    } finally {
+      setMyRequestLoading(false);
+    }
+  }, [token]);
+
+  const selectPin = useCallback((pin: (typeof pins)[number]) => {
+    lastPinTapAtRef.current = Date.now();
+    setDraftPin(null);
+    setSelectedPin(pin);
+    const postId = String(pin.id);
+    const isHost = pin.host_id === user?.id || pin.hostId === user?.id;
+    if (!token || isHost) {
+      setMyRequest(null);
+      setMyRequestLoading(false);
+    } else {
+      const cached = myRequestCacheRef.current.get(postId);
+      if (cached !== undefined) {
+        setMyRequest(cached);
+        setMyRequestLoading(false);
+      } else {
+        setMyRequest(null);
+        setMyRequestLoading(true);
+      }
+      void loadMyRequestForPin(postId);
+    }
+    if (pin?.lat != null && pin?.lng != null) {
+      mapRef.current?.animateToRegion(
+        { latitude: pin.lat, longitude: pin.lng, latitudeDelta: 0.02, longitudeDelta: 0.02 },
+        300
+      );
+    }
+  }, [loadMyRequestForPin, token, user?.id]);
+
+  /** Refresh join status when returning from post details (e.g. joined there). */
+  useFocusEffect(
+    useCallback(() => {
+      if (!selectedPin || !token) return;
+      const isHost = selectedPin.host_id === user?.id || selectedPin.hostId === user?.id;
+      if (isHost) return;
+      void loadMyRequestForPin(String(selectedPin.id));
+    }, [selectedPin, token, user?.id, loadMyRequestForPin])
+  );
+
   async function handleJoin() {
     if (!selectedPin || !token) return;
     setReqLoading(true);
     try {
       const result = await requestsApi.send(selectedPin.id);
-      setReqDone(true);
+      const myReq = await requestsApi.myRequest(selectedPin.id);
+      const val = myReq ?? null;
+      myRequestCacheRef.current.set(String(selectedPin.id), val);
+      setMyRequest(val);
       if ((result as { status?: string } | undefined)?.status === "approved") {
         alert.show("Joined", "You're in. Open the post details to access the group chat.", undefined, "success");
       }
@@ -608,20 +672,7 @@ export default function MapScreen() {
             pin={pin}
             selected={selectedPin?.id === pin.id}
             pulse={freshPinIds.has(String(pin.id))}
-            onPress={() => {
-              lastPinTapAtRef.current = Date.now();
-              setDraftPin(null);
-              setSelectedPin(pin);
-              setReqDone(false);
-              if (pin?.lat != null && pin?.lng != null) {
-                mapRef.current?.animateToRegion({
-                  latitude: pin.lat,
-                  longitude: pin.lng,
-                  latitudeDelta: 0.02,
-                  longitudeDelta: 0.02,
-                }, 300);
-              }
-            }}
+            onPress={() => selectPin(pin)}
           />
         ))}
       </MapView>
@@ -851,46 +902,93 @@ export default function MapScreen() {
             {(selectedPin.cost_per_person ?? selectedPin.costPerPerson) > 0 && <PinMeta icon="cash-outline" value={`₹${selectedPin.cost_per_person ?? selectedPin.costPerPerson}`} sub={sub} />}
           </View>
 
-          {reqDone ? (
-            <View style={[s.successBanner, { backgroundColor: "#30D15818" }]}>
-              <Ionicons name="checkmark-circle" size={18} color="#30D158" />
-              <Text style={{ color: "#30D158", fontWeight: "600", marginLeft: 8 }}>
-                {(selectedPin.privacy_type ?? selectedPin.privacyType) === "approval"
-                  ? "Request sent! Waiting for approval."
-                  : "Joined! Open details for the group chat."}
-              </Text>
-            </View>
-          ) : (
-            <View style={{ flexDirection: "row", gap: 10 }}>
-              <TouchableOpacity
-                onPress={() => router.push(`/post/${selectedPin.id}`)}
-                style={[s.outlineBtn, { borderColor: PRIMARY, flex: 1 }]}
-              >
-                <Text style={[s.outlineBtnText, { color: PRIMARY }]}>View Details</Text>
-              </TouchableOpacity>
-              {token && selectedPin.host_id !== user?.id && selectedPin.hostId !== user?.id && (
+          {(() => {
+            const requiresApproval =
+              (selectedPin.privacy_type ?? selectedPin.privacyType) === "approval";
+            const isHost =
+              selectedPin.host_id === user?.id || selectedPin.hostId === user?.id;
+
+            if (myRequestLoading) {
+              return (
+                <View style={s.actionLoading}>
+                  <ActivityIndicator color={PRIMARY} size="small" />
+                </View>
+              );
+            }
+
+            if (myRequest) {
+              const approved = myRequest.status === "approved";
+              const rejected = myRequest.status === "rejected";
+              const bannerColor = rejected ? "#FF453A" : "#30D158";
+              const bannerBg = rejected ? "#FF453A18" : "#30D15818";
+              const bannerIcon = rejected
+                ? "close-circle"
+                : approved
+                  ? "checkmark-circle"
+                  : "time-outline";
+              const bannerText = rejected
+                ? "Your request wasn't approved this time."
+                : approved
+                  ? "You're in! Open details for the group chat."
+                  : requiresApproval
+                    ? "Request sent! Waiting for approval."
+                    : "Joined! Open details for the group chat.";
+
+              return (
+                <View style={s.pinActions}>
+                  <View style={[s.statusBanner, { backgroundColor: bannerBg }]}>
+                    <Ionicons name={bannerIcon} size={18} color={bannerColor} />
+                    <Text style={[s.statusBannerText, { color: bannerColor }]}>{bannerText}</Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => router.push(`/post/${selectedPin.id}`)}
+                    style={[s.outlineBtn, { borderColor: PRIMARY }]}
+                  >
+                    <Text style={[s.outlineBtnText, { color: PRIMARY }]}>View Details</Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            }
+
+            return (
+              <View style={s.pinActionRow}>
                 <TouchableOpacity
-                  onPress={handleJoin}
-                  disabled={reqLoading}
-                  style={[s.primaryBtn, { flex: 1.5 }]}
+                  onPress={() => router.push(`/post/${selectedPin.id}`)}
+                  style={[s.outlineBtn, { borderColor: PRIMARY, flex: 1, minWidth: 0 }]}
                 >
-                  {reqLoading ? <ActivityIndicator color="#fff" size="small" /> : (
-                    <>
-                      <Ionicons name="person-add-outline" size={16} color="#fff" style={{ marginRight: 6 }} />
-                      <Text style={s.primaryBtnText}>
-                        {(selectedPin.privacy_type ?? selectedPin.privacyType) === "approval" ? "Request to Join" : "Join Now"}
-                      </Text>
-                    </>
-                  )}
+                  <Text style={[s.outlineBtnText, { color: PRIMARY }]} numberOfLines={1}>
+                    View Details
+                  </Text>
                 </TouchableOpacity>
-              )}
-              {!token && (
-                <TouchableOpacity onPress={() => router.push("/login")} style={[s.primaryBtn, { flex: 1.5 }]}>
-                  <Text style={s.primaryBtnText}>Sign in to Join</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
+                {token && !isHost && (
+                  <TouchableOpacity
+                    onPress={handleJoin}
+                    disabled={reqLoading}
+                    style={[s.primaryBtn, { flex: 1.5, minWidth: 0 }]}
+                  >
+                    {reqLoading ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <>
+                        <Ionicons name="person-add-outline" size={16} color="#fff" style={{ marginRight: 6 }} />
+                        <Text style={s.primaryBtnText} numberOfLines={1}>
+                          {requiresApproval ? "Request to Join" : "Join Now"}
+                        </Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                )}
+                {!token && (
+                  <TouchableOpacity
+                    onPress={() => router.push("/login")}
+                    style={[s.primaryBtn, { flex: 1.5, minWidth: 0 }]}
+                  >
+                    <Text style={s.primaryBtnText} numberOfLines={1}>Sign in to Join</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            );
+          })()}
         </View>
       )}
       {draftPin && !selectedPin && (
@@ -1036,7 +1134,17 @@ const s = StyleSheet.create({
   catBadge: { alignSelf: "flex-start", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
   catBadgeText: { fontSize: 12, fontWeight: "700", textTransform: "capitalize" },
   closeBtn: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", marginLeft: 12 },
-  successBanner: { flexDirection: "row", alignItems: "center", padding: 14, borderRadius: 14 },
+  pinActions: { gap: 10 },
+  pinActionRow: { flexDirection: "row", gap: 10, alignItems: "stretch" },
+  actionLoading: { paddingVertical: 18, alignItems: "center", justifyContent: "center" },
+  statusBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 14,
+    borderRadius: 14,
+    gap: 8,
+  },
+  statusBannerText: { flex: 1, fontWeight: "600", fontSize: 14, lineHeight: 20 },
   outlineBtn: { borderWidth: 1.5, borderRadius: 14, paddingVertical: 14, alignItems: "center", justifyContent: "center" },
   outlineBtnText: { fontWeight: "700", fontSize: 14 },
   primaryBtn: {

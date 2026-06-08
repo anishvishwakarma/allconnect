@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useFocusEffect } from "expo-router";
 import {
-  View, Text, FlatList, TextInput, TouchableOpacity,
-  KeyboardAvoidingView, Platform, ActivityIndicator,
-  StyleSheet,
+  View, Text, FlatList, TextInput, TouchableOpacity, Image, ScrollView,
+  Keyboard, Platform, ActivityIndicator, Dimensions, StyleSheet,
+  KeyboardAvoidingView,
+  type KeyboardEvent,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -11,14 +12,30 @@ import { chatsApi } from "../../services/api";
 import { getSocket, joinChatRoom, leaveChatRoom, emitTyping, emitStopTyping } from "../../services/socket";
 import { useAuthStore } from "../../store/auth";
 import { useAppInsets } from "../../hooks/useAppInsets";
+import { getFooterBottomInset } from "../../constants/config";
 import { useAppTheme } from "../../context/ThemeContext";
 import { useAlert } from "../../context/AlertContext";
 import { useBadgeStore } from "../../store/badges";
+import { getInitials } from "../../utils/profile";
+import type { ChatMember } from "../../types";
 
 const PRIMARY = "#E8751A";
 
+/** Lift footer above keyboard without double-counting adjustResize when it already shrank the window. */
+function keyboardInsetFromEvent(e: KeyboardEvent): number {
+  const { screenY, height } = e.endCoordinates;
+  const windowH = Dimensions.get("window").height;
+  const screenH = Dimensions.get("screen").height;
+  const fromScreenY = Math.max(0, Math.round(windowH - screenY));
+  if (fromScreenY > 20) return fromScreenY;
+  const windowShrunk = screenH - windowH > 80;
+  if (!windowShrunk && height > 0) return height;
+  return fromScreenY;
+}
+
 export default function ChatScreen() {
-  const { top, bottom, raw: insets } = useAppInsets();
+  const { top, bottom, left, right, raw: safeInsets } = useAppInsets();
+  const footerBottomInset = getFooterBottomInset(safeInsets.bottom);
   const { id: rawId } = useLocalSearchParams<{ id: string }>();
   const id = typeof rawId === "string" ? rawId : Array.isArray(rawId) ? rawId[0] : "";
   const user = useAuthStore((s) => s.user);
@@ -30,8 +47,35 @@ export default function ChatScreen() {
   const [loading, setLoading] = useState(true);
   const [typing, setTyping] = useState(false);
   const [expired, setExpired] = useState(false);
+  const [members, setMembers] = useState<ChatMember[]>([]);
+  const [keyboardInset, setKeyboardInset] = useState(0);
   const flatRef = useRef<FlatList>(null);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const membersRef = useRef<ChatMember[]>([]);
+  const membersRefreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  membersRef.current = members;
+
+  useEffect(() => {
+    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+    const frameEvent = Platform.OS === "android" ? "keyboardDidChangeFrame" : null;
+
+    const onShow = (e: KeyboardEvent) => {
+      setKeyboardInset(keyboardInsetFromEvent(e));
+      setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 100);
+    };
+    const onHide = () => setKeyboardInset(0);
+
+    const showSub = Keyboard.addListener(showEvent, onShow);
+    const hideSub = Keyboard.addListener(hideEvent, onHide);
+    const frameSub = frameEvent ? Keyboard.addListener(frameEvent, onShow) : null;
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+      frameSub?.remove();
+    };
+  }, []);
 
   const bg = isDark ? "#0C0C0F" : "#F5F5F7";
   const surface = isDark ? "#1A1A1F" : "#FFFFFF";
@@ -42,6 +86,28 @@ export default function ChatScreen() {
   const myMsgBg = PRIMARY;
   const theirMsgBg = isDark ? "#252528" : "#FFFFFF";
 
+  const refreshMembers = useCallback(async () => {
+    if (!id) return;
+    try {
+      const memberRes = await chatsApi.members(id);
+      if (memberRes?.expired) {
+        setExpired(true);
+        setMembers([]);
+      } else {
+        setMembers(memberRes?.members ?? []);
+      }
+    } catch {
+      // Keep current list on transient errors.
+    }
+  }, [id]);
+
+  const scheduleMembersRefresh = useCallback(() => {
+    if (membersRefreshTimer.current) clearTimeout(membersRefreshTimer.current);
+    membersRefreshTimer.current = setTimeout(() => {
+      void refreshMembers();
+    }, 400);
+  }, [refreshMembers]);
+
   useEffect(() => {
     if (!token) {
       setLoading(false);
@@ -51,18 +117,37 @@ export default function ChatScreen() {
     if (!id) { setLoading(false); return; }
     const socket = getSocket();
     let isMounted = true;
-    const handleNewMessage = (msg: { id: string; user_id: string; user_name?: string | null; body: string; created_at: string }) => {
+    const handleNewMessage = (msg: {
+      id: string;
+      user_id: string;
+      user_name?: string | null;
+      user_avatar_uri?: string | null;
+      body: string;
+      created_at: string;
+    }) => {
       setMessages((p) => {
         const exists = p.some((m) => m.id === msg.id);
         if (exists) return p;
-        return [...p, { id: msg.id, user_id: msg.user_id, user_name: msg.user_name, body: msg.body, created_at: msg.created_at }];
+        return [...p, {
+          id: msg.id,
+          user_id: msg.user_id,
+          user_name: msg.user_name,
+          user_avatar_uri: msg.user_avatar_uri,
+          body: msg.body,
+          created_at: msg.created_at,
+        }];
       });
+      const knownMember = membersRef.current.some((m) => m.id === msg.user_id);
+      if (!knownMember) scheduleMembersRefresh();
       setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 80);
     };
     const handleExpired = () => {
       setExpired(true);
+      setTyping(false);
+      setMembers([]);
       alert.show("Chat ended", "This event has ended. The chat is now read-only.", undefined, "info");
     };
+    const handleMembersUpdated = () => scheduleMembersRefresh();
 
     loadMessages().then((canJoin) => {
       if (!isMounted || !canJoin) return;
@@ -71,36 +156,55 @@ export default function ChatScreen() {
       socket.on("chat:typing", () => setTyping(true));
       socket.on("chat:stop_typing", () => setTyping(false));
       socket.on("chat:expired", handleExpired);
+      socket.on("chat:members_updated", handleMembersUpdated);
     });
 
     return () => {
       isMounted = false;
+      if (membersRefreshTimer.current) clearTimeout(membersRefreshTimer.current);
       leaveChatRoom(id);
       socket.off("new_message", handleNewMessage);
       socket.off("chat:typing");
       socket.off("chat:stop_typing");
       socket.off("chat:expired", handleExpired);
+      socket.off("chat:members_updated", handleMembersUpdated);
     };
-  }, [id, token]);
+  }, [id, token, scheduleMembersRefresh]);
 
   useFocusEffect(
     useCallback(() => {
+      if (id && token) void refreshMembers();
       return () => {
         void useBadgeStore.getState().refresh();
       };
-    }, [])
+    }, [id, token, refreshMembers])
   );
 
   async function loadMessages(): Promise<boolean> {
     try {
       const res = await chatsApi.messages(id);
       const list = res?.messages ?? (Array.isArray(res) ? res : []);
+      const isExpired = !!(res && typeof res === "object" && !Array.isArray(res) && res.expired);
       setMessages(list);
-      if (res && typeof res === "object" && !Array.isArray(res) && res.expired) setExpired(true);
+      setExpired(isExpired);
+      if (isExpired) {
+        setTyping(false);
+        setMembers([]);
+      } else {
+        try {
+          const memberRes = await chatsApi.members(id);
+          setMembers(memberRes?.expired ? [] : (memberRes?.members ?? []));
+        } catch {
+          setMembers([]);
+        }
+      }
       setTimeout(() => flatRef.current?.scrollToEnd({ animated: false }), 80);
       return true;
     } catch (err: any) {
-      if (err.message?.includes("expired")) setExpired(true);
+      if (err.message?.includes("expired")) {
+        setExpired(true);
+        setMembers([]);
+      }
       if (err.message?.includes("Not a member")) {
         alert.show("Access denied", "You are not a member of this chat.", undefined, "info");
         router.back();
@@ -124,17 +228,29 @@ export default function ChatScreen() {
     emitStopTyping(id);
     try {
       const msg = await chatsApi.send(id, t);
-      // Avoid duplicates when the REST response and socket event arrive together.
       setMessages((p) => {
         const exists = p.some((m) => m.id === msg.id);
         if (exists) return p;
-        return [...p, { id: msg.id, user_id: msg.user_id, user_name: msg.user_name, body: msg.body, created_at: msg.created_at }];
+        return [...p, {
+          id: msg.id,
+          user_id: msg.user_id,
+          user_name: msg.user_name,
+          user_avatar_uri: msg.user_avatar_uri ?? user?.avatar_uri,
+          body: msg.body,
+          created_at: msg.created_at,
+        }];
       });
       setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 80);
     } catch (_) {
       setInput(t);
     }
   }
+
+  const membersMap = useMemo(() => {
+    const map = new Map<string, ChatMember>();
+    for (const m of members) map.set(m.id, m);
+    return map;
+  }, [members]);
 
   const renderItem = useCallback(({ item, index }: any) => {
     const isMe = item.user_id === user?.id;
@@ -143,12 +259,16 @@ export default function ChatScreen() {
     const body = item.body ?? item.text;
     const createdAt = item.created_at ?? item.createdAt;
     const senderName = item.user_name?.trim() || "User";
-    const senderInitial = senderName.charAt(0).toUpperCase() || "U";
+    const avatarUri =
+      !expired
+        ? (item.user_avatar_uri || membersMap.get(item.user_id)?.avatar_uri || null)
+        : null;
+    const showAvatar = !isMe;
     return (
       <View style={[msgS.row, isMe && msgS.myRow]}>
-        {!isMe && (
-          <View style={[msgS.avatar, showName ? { opacity: 1 } : { opacity: 0 }]}>
-            <Text style={msgS.avatarText}>{senderInitial}</Text>
+        {showAvatar && (
+          <View style={[msgS.avatarSlot, showName || avatarUri ? { opacity: 1 } : { opacity: 0 }]}>
+            <ChatAvatar uri={avatarUri} name={senderName} size={32} />
           </View>
         )}
         <View style={[msgS.bubble, isMe ? [msgS.myBubble, { backgroundColor: myMsgBg }] : [msgS.theirBubble, { backgroundColor: theirMsgBg, borderColor: border }]]}>
@@ -160,7 +280,7 @@ export default function ChatScreen() {
         </View>
       </View>
     );
-  }, [user?.id, messages, isDark]);
+  }, [user?.id, messages, isDark, text, sub, border, expired, membersMap]);
 
   if (token && !id) {
     return (
@@ -173,12 +293,15 @@ export default function ChatScreen() {
     );
   }
 
+  const keyboardOpen = keyboardInset > 0;
+  const footerPad = keyboardOpen ? 8 : footerBottomInset;
+
   return (
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: bg }}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       enabled={Platform.OS === "ios"}
-      keyboardVerticalOffset={Platform.OS === "ios" ? top + 56 : 0}
+      keyboardVerticalOffset={top}
     >
       {/* Header */}
       <View style={[s.header, { backgroundColor: surface, borderBottomColor: border, paddingTop: top + 12 }]}>
@@ -195,6 +318,25 @@ export default function ChatScreen() {
         </View>
       </View>
 
+      {!expired && members.length > 0 && (
+        <View style={[s.membersBar, { backgroundColor: surface, borderBottomColor: border }]}>
+          <Text style={[s.membersLabel, { color: sub }]}>In this chat</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.membersScroll}>
+            {members.map((m) => {
+              const label = m.id === user?.id ? "You" : (m.name?.trim() || "Member");
+              return (
+                <View key={m.id} style={s.memberChip}>
+                  <ChatAvatar uri={m.avatar_uri} name={m.name || "Member"} size={40} />
+                  <Text style={[s.memberName, { color: text }]} numberOfLines={1}>
+                    {label}
+                  </Text>
+                </View>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
+
       {/* Messages */}
       {loading ? (
         <View style={s.center}><ActivityIndicator color={PRIMARY} size="large" /></View>
@@ -204,7 +346,16 @@ export default function ChatScreen() {
           data={messages}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: bottom + 8, gap: 4 }}
+          style={{ flex: 1 }}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          contentContainerStyle={{
+            paddingHorizontal: 16,
+            paddingTop: 16,
+            paddingBottom: 12,
+            gap: 4,
+            flexGrow: 1,
+          }}
           onContentSizeChange={() => flatRef.current?.scrollToEnd({ animated: false })}
           ListEmptyComponent={
             <View style={s.center}>
@@ -218,48 +369,88 @@ export default function ChatScreen() {
         />
       )}
 
-      {/* Typing indicator */}
-      {typing && (
-        <View style={[s.typingRow, { backgroundColor: bg }]}>
-          <View style={[s.typingBubble, { backgroundColor: isDark ? "#252528" : "#F0F0F3" }]}>
-            <Text style={[s.typingText, { color: sub }]}>Someone is typing</Text>
-            <Text style={[s.typingDots, { color: PRIMARY }]}>···</Text>
+      {/* Footer — flex; Android lifts via marginBottom, iOS via KeyboardAvoidingView above */}
+      <View
+        style={{
+          marginBottom: Platform.OS === "android" ? keyboardInset : 0,
+          paddingLeft: left,
+          paddingRight: right,
+          paddingBottom: footerPad,
+          backgroundColor: bg,
+        }}
+      >
+        {typing && !expired && (
+          <View style={[s.typingRow, { backgroundColor: bg }]}>
+            <View style={[s.typingBubble, { backgroundColor: isDark ? "#252528" : "#F0F0F3" }]}>
+              <Text style={[s.typingText, { color: sub }]}>Someone is typing</Text>
+              <Text style={[s.typingDots, { color: PRIMARY }]}>···</Text>
+            </View>
           </View>
-        </View>
-      )}
+        )}
 
-      {/* Input bar */}
-      {!expired ? (
-        <View style={[s.inputBar, { backgroundColor: surface, borderTopColor: border, paddingBottom: bottom }]}>
-          <TextInput
-            value={input} onChangeText={handleChange}
-            placeholder="Message..." placeholderTextColor={sub}
-            multiline maxLength={2000}
-            style={[s.inputField, { backgroundColor: inputBg, color: text, borderColor: input ? PRIMARY : border }]}
-          />
-          <TouchableOpacity
-            onPress={send}
-            disabled={!input.trim()}
-            style={[s.sendBtn, { backgroundColor: input.trim() ? PRIMARY : (isDark ? "#252528" : "#F0F0F3") }]}
-          >
-            <Ionicons name="send" size={16} color={input.trim() ? "#fff" : sub} />
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <View style={[s.expiredBar, { backgroundColor: "#FF453A10", borderTopColor: "#FF453A30", paddingBottom: bottom }]}>
-          <Ionicons name="lock-closed-outline" size={14} color="#FF453A" />
-          <Text style={s.expiredBarText}>Chat ended · read-only (replies disabled)</Text>
-        </View>
-      )}
+        {!expired ? (
+          <View style={[s.inputBar, { backgroundColor: surface, borderTopColor: border }]}>
+            <TextInput
+              value={input}
+              onChangeText={handleChange}
+              placeholder="Message..."
+              placeholderTextColor={sub}
+              multiline
+              maxLength={2000}
+              style={[s.inputField, { backgroundColor: inputBg, color: text, borderColor: input ? PRIMARY : border }]}
+            />
+            <TouchableOpacity
+              onPress={send}
+              disabled={!input.trim()}
+              style={[s.sendBtn, { backgroundColor: input.trim() ? PRIMARY : (isDark ? "#252528" : "#F0F0F3") }]}
+            >
+              <Ionicons name="send" size={16} color={input.trim() ? "#fff" : sub} />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={[s.expiredBar, { backgroundColor: "#FF453A10", borderTopColor: "#FF453A30" }]}>
+            <Ionicons name="lock-closed-outline" size={14} color="#FF453A" />
+            <Text style={s.expiredBarText}>Chat ended · read-only (replies disabled)</Text>
+          </View>
+        )}
+      </View>
     </KeyboardAvoidingView>
+  );
+}
+
+function ChatAvatar({ uri, name, size }: { uri?: string | null; name?: string | null; size: number }) {
+  const [imgFailed, setImgFailed] = useState(false);
+  useEffect(() => { setImgFailed(false); }, [uri]);
+  const initial = getInitials(name);
+  if (uri && !imgFailed) {
+    return (
+      <Image
+        source={{ uri }}
+        style={{ width: size, height: size, borderRadius: size / 2 }}
+        onError={() => setImgFailed(true)}
+      />
+    );
+  }
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        backgroundColor: "#E8751A18",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <Text style={{ fontSize: size * 0.38, fontWeight: "700", color: PRIMARY }}>{initial}</Text>
+    </View>
   );
 }
 
 const msgS = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "flex-end", gap: 8, marginBottom: 2 },
   myRow: { flexDirection: "row-reverse" },
-  avatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: "#E8751A18", alignItems: "center", justifyContent: "center" },
-  avatarText: { fontSize: 13, fontWeight: "700", color: "#E8751A" },
+  avatarSlot: { width: 32, height: 32 },
   bubble: { maxWidth: "75%", paddingHorizontal: 14, paddingVertical: 10, borderRadius: 18 },
   myBubble: { borderBottomRightRadius: 4, shadowColor: "#E8751A", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 2 },
   theirBubble: { borderBottomLeftRadius: 4, borderWidth: StyleSheet.hairlineWidth, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 1 },
@@ -272,6 +463,11 @@ const s = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingBottom: 14, borderBottomWidth: StyleSheet.hairlineWidth },
   backBtn: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
   headerTitle: { fontSize: 17, fontWeight: "700" },
+  membersBar: { borderBottomWidth: StyleSheet.hairlineWidth, paddingTop: 10, paddingBottom: 12 },
+  membersLabel: { fontSize: 11, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.6, paddingHorizontal: 16, marginBottom: 8 },
+  membersScroll: { paddingHorizontal: 12, gap: 14, alignItems: "flex-start" },
+  memberChip: { width: 56, alignItems: "center", gap: 4 },
+  memberName: { fontSize: 11, fontWeight: "600", textAlign: "center", maxWidth: 56 },
   expiredLabel: { fontSize: 11, color: "#FF453A", fontWeight: "600", marginTop: 2 },
   statusIndicator: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12 },
   statusDot: { width: 6, height: 6, borderRadius: 3 },
@@ -289,6 +485,6 @@ const s = StyleSheet.create({
   inputBar: { flexDirection: "row", alignItems: "flex-end", gap: 10, paddingHorizontal: 14, paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth },
   inputField: { flex: 1, borderWidth: 1.5, borderRadius: 22, paddingHorizontal: 16, paddingVertical: 10, fontSize: 15, maxHeight: 110, minHeight: 44 },
   sendBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", shadowColor: "#E8751A", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6, elevation: 3 },
-  expiredBar: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderTopWidth: 1 },
+  expiredBar: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 12, borderTopWidth: 1 },
   expiredBarText: { color: "#FF453A", fontSize: 13, fontWeight: "600" },
 });

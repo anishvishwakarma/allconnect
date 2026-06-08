@@ -102,6 +102,20 @@ export function getBottomInset(bottom: number): number {
   return 0;
 }
 
+/**
+ * Bottom padding for full-screen footers (chat input, etc.) — taller than getBottomInset
+ * so send buttons clear 3-button nav and gesture bars on edge-to-edge Android.
+ */
+export function getFooterBottomInset(bottom: number): number {
+  const raw = Math.max(0, bottom);
+  if (raw > 0) {
+    return Math.max(raw, Platform.OS === "android" ? 16 : 10);
+  }
+  if (Platform.OS === "android") return 48;
+  if (Platform.OS === "ios") return 20;
+  return 0;
+}
+
 export function getHorizontalInsets(left: number, right: number): { left: number; right: number } {
   return { left: Math.max(0, left), right: Math.max(0, right) };
 }

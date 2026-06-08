@@ -1,7 +1,7 @@
 import { API_URL } from '../constants/config';
 import { disconnectSocket } from './socket';
 import { useAuthStore } from '../store/auth';
-import type { Post, JoinRequest, GroupChat, Message, User, AppNotification } from '../types';
+import type { Post, JoinRequest, GroupChat, Message, ChatMember, User, AppNotification } from '../types';
 
 const DEFAULT_TIMEOUT_MS = 15000;
 const AUTH_TIMEOUT_MS = 45000; // Render cold start can take 30–60s
@@ -217,6 +217,8 @@ export const requestsApi = {
 // ── Chats ────────────────────────────────────────────────
 export const chatsApi = {
   mine: () => request<GroupChat[]>('/api/chats/groups'),
+  members: (groupId: string) =>
+    request<{ expired: boolean; members: ChatMember[] }>(`/api/chats/groups/${groupId}/members`),
   messages: (groupId: string) =>
     request<{ messages: Message[]; expired?: boolean }>(`/api/chats/groups/${groupId}/messages`),
   send: (groupId: string, body: string) =>

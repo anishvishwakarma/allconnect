@@ -130,7 +130,7 @@ export default function ProfileScreen() {
         <Text style={[s.phoneText, { color: sub }]}>{user?.email || (user?.mobile?.startsWith?.("email:") ? user.mobile.replace("email:", "") : user?.mobile)}</Text>
         <View style={[s.privacyBadge, { backgroundColor: isDark ? "#252528" : "#F0F0F3" }]}>
           <Ionicons name="eye-off-outline" size={12} color={sub} />
-          <Text style={[s.privacyText, { color: sub }]}>Only hosts see your name when you request to join</Text>
+          <Text style={[s.privacyText, { color: sub }]}>Hosts see your name on join requests · live chat members see each other</Text>
         </View>
       </View>
 
