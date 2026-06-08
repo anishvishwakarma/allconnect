@@ -13,7 +13,7 @@ const DEFAULT_ANDROID_STORE =
  */
 router.get('/version', rateLimitHealth, (req, res) => {
   const platform = String(req.query.platform || '').toLowerCase();
-  const latest = (process.env.APP_LATEST_VERSION || '1.1.4').trim();
+  const latest = (process.env.APP_LATEST_VERSION || '1.1.5').trim();
   const minAndroid = (process.env.APP_MIN_VERSION_ANDROID || '1.1.1').trim();
   const minIos = (process.env.APP_MIN_VERSION_IOS || '1.1.1').trim();
   const minVersion = platform === 'ios' ? minIos : minAndroid;
