@@ -127,10 +127,10 @@ export default function ProfileScreen() {
             </View>
           )}
         </View>
-        <Text style={[s.phoneText, { color: sub }]}>{user?.email || (user?.mobile?.startsWith?.("email:") ? user.mobile.replace("email:", "") : user?.mobile)}</Text>
+        <Text style={[s.displayName, { color: text }]}>{user?.name?.trim() || "Not set"}</Text>
         <View style={[s.privacyBadge, { backgroundColor: isDark ? "#252528" : "#F0F0F3" }]}>
-          <Ionicons name="eye-off-outline" size={12} color={sub} />
-          <Text style={[s.privacyText, { color: sub }]}>Hosts see your name on join requests · live chat members see each other</Text>
+          <Ionicons name="eye-off-outline" size={12} color={sub} style={{ marginTop: 1 }} />
+          <Text style={[s.privacyText, { color: sub }]}>Name & profile photo shared with hosts & live chat members</Text>
         </View>
       </View>
 
@@ -268,14 +268,14 @@ const s = StyleSheet.create({
   title: { fontSize: 28, fontWeight: "800", letterSpacing: -0.5 },
   editBtn: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, borderWidth: 1 },
   editBtnText: { fontSize: 13, fontWeight: "600" },
-  avatarSection: { alignItems: "center", paddingVertical: 28, gap: 8 },
+  avatarSection: { alignItems: "center", paddingVertical: 28, paddingHorizontal: 24, gap: 8 },
   avatarRing: { width: 96, height: 96, borderRadius: 48, borderWidth: 3, padding: 4, overflow: "hidden" },
   avatar: { width: "100%", height: "100%", borderRadius: 42, alignItems: "center", justifyContent: "center" },
   avatarImage: { width: "100%", height: "100%", borderRadius: 42 },
   avatarText: { fontSize: 36, fontWeight: "800" },
-  phoneText: { fontSize: 14, fontWeight: "500" },
-  privacyBadge: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
-  privacyText: { fontSize: 11, fontWeight: "500" },
+  displayName: { fontSize: 18, fontWeight: "700" },
+  privacyBadge: { flexDirection: "row", alignItems: "flex-start", gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, maxWidth: "100%" },
+  privacyText: { fontSize: 11, fontWeight: "500", flexShrink: 1, textAlign: "center", lineHeight: 15 },
   card: { borderRadius: 18, borderWidth: StyleSheet.hairlineWidth, overflow: "hidden", shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 1 },
   fieldRow: { flexDirection: "row", alignItems: "flex-start", gap: 14, padding: 16 },
   fieldIcon: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", marginTop: 2 },
