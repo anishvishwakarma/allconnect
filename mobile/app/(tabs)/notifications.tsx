@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl } from "react-native";
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl } from "react-native";
+import { NotificationListSkeleton } from "../../components/Skeleton";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -122,7 +123,7 @@ export default function NotificationsScreen() {
         </TouchableOpacity>
       </View>
       {loading ? (
-        <View style={s.center}><ActivityIndicator color={PRIMARY} size="large" /></View>
+        <NotificationListSkeleton />
       ) : (
         <FlatList
           data={items}

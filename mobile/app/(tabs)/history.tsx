@@ -2,8 +2,9 @@ import { useCallback, useEffect, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import {
   View, Text, FlatList, TouchableOpacity,
-  StyleSheet, ActivityIndicator, RefreshControl,
+  StyleSheet, RefreshControl,
 } from "react-native";
+import { HistoryListSkeleton } from "../../components/Skeleton";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -74,7 +75,7 @@ export default function HistoryScreen() {
         <Text style={[s.subtitle, { color: sub }]}>Your posts and joined events</Text>
       </View>
       {loading ? (
-        <View style={s.center}><ActivityIndicator color={PRIMARY} size="large" /></View>
+        <HistoryListSkeleton />
       ) : (
         <FlatList
           data={items}
