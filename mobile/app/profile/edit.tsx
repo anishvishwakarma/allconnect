@@ -182,13 +182,14 @@ export default function EditProfileScreen() {
         style={[s.input, { backgroundColor: surface, color: text, borderColor: border }]}
       />
       <Text style={[s.label, { color: sub }]}>Email</Text>
-      <TextInput
-        placeholder="email@example.com"
-        placeholderTextColor={sub}
-        value={email}
-        editable={false}
-        style={[s.input, { backgroundColor: surface, color: text, borderColor: border }]}
-      />
+      <View style={[s.readOnlyField, { backgroundColor: isDark ? "#252528" : "#F0F0F3", borderColor: border }]}>
+        <Ionicons name="mail-outline" size={16} color={sub} />
+        <Text style={[s.readOnlyText, { color: text }]} numberOfLines={1}>
+          {email || "—"}
+        </Text>
+        <Ionicons name="lock-closed-outline" size={14} color={sub} />
+      </View>
+      <Text style={[s.readOnlyHint, { color: sub }]}>Your login email is fixed and cannot be changed.</Text>
       <TouchableOpacity onPress={save} disabled={saving} style={[s.btn, { backgroundColor: PRIMARY }]}>
         {saving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.btnText}>Save</Text>}
       </TouchableOpacity>
@@ -235,6 +236,18 @@ const s = StyleSheet.create({
   uploadBtnText: { color: "#fff", fontSize: 15, fontWeight: "700" },
   label: { fontSize: 14, marginBottom: 4 },
   input: { borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, fontSize: 16, marginBottom: 16, borderWidth: 1 },
+  readOnlyField: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 6,
+    borderWidth: 1,
+  },
+  readOnlyText: { flex: 1, fontSize: 16, fontWeight: "500" },
+  readOnlyHint: { fontSize: 12, marginBottom: 16, lineHeight: 16 },
   btn: { borderRadius: 12, paddingVertical: 14, alignItems: "center" },
   btnText: { color: "#fff", fontWeight: "600", fontSize: 16 },
 });

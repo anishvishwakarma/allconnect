@@ -8,4 +8,5 @@ serviceAccount*.json
 *.key
 *.log
 *.md
+!README.md
 .DS_Store

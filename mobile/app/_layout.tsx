@@ -8,11 +8,13 @@ import { AlertProvider } from "../context/AlertContext";
 import { useAuthStore } from "../store/auth";
 import { useAppUpdateCheck } from "../hooks/useAppUpdateCheck";
 import { isExpoGo } from "../constants/config";
+import { useServerWarmup } from "../hooks/useServerWarmup";
 
 function RootStack() {
   const token = useAuthStore((s) => s.token);
   const hasHydrated = useAuthStore((s) => s.hasHydrated);
   useAppUpdateCheck();
+  useServerWarmup();
 
   /** Portrait on phones without android:screenOrientation=PORTRAIT in manifest (Play Console policy). */
   useEffect(() => {

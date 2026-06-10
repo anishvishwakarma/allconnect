@@ -129,7 +129,7 @@ export default function ProfileScreen() {
         </View>
         <Text style={[s.displayName, { color: text }]}>{user?.name?.trim() || "Not set"}</Text>
         <View style={[s.privacyBadge, { backgroundColor: isDark ? "#252528" : "#F0F0F3" }]}>
-          <Ionicons name="eye-off-outline" size={12} color={sub} style={{ marginTop: 1 }} />
+          <Ionicons name="eye-off-outline" size={12} color={sub} />
           <Text style={[s.privacyText, { color: sub }]}>Name & profile photo shared with hosts & live chat members</Text>
         </View>
       </View>
@@ -158,13 +158,10 @@ export default function ProfileScreen() {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[s.fieldLabel, { color: sub }]}>Email</Text>
+              <Text style={[s.fieldValue, { color: email ? text : sub }]}>{email || "Not set"}</Text>
               {editing ? (
-                <TextInput value={email} placeholder="your@email.com" placeholderTextColor={sub}
-                  editable={false}
-                  style={[s.fieldInput, { color: text, borderBottomColor: PRIMARY }]} />
-              ) : (
-                <Text style={[s.fieldValue, { color: email ? text : sub }]}>{email || "Not set"}</Text>
-              )}
+                <Text style={[s.fieldHint, { color: sub }]}>Login email cannot be changed</Text>
+              ) : null}
             </View>
           </View>
         </View>
@@ -274,8 +271,9 @@ const s = StyleSheet.create({
   avatarImage: { width: "100%", height: "100%", borderRadius: 42 },
   avatarText: { fontSize: 36, fontWeight: "800" },
   displayName: { fontSize: 18, fontWeight: "700" },
-  privacyBadge: { flexDirection: "row", alignItems: "flex-start", gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, maxWidth: "100%" },
-  privacyText: { fontSize: 11, fontWeight: "500", flexShrink: 1, textAlign: "center", lineHeight: 15 },
+  privacyBadge: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, maxWidth: "100%" },
+  privacyText: { fontSize: 11, fontWeight: "500", flex: 1, lineHeight: 15 },
+  fieldHint: { fontSize: 11, marginTop: 4, fontStyle: "italic" },
   card: { borderRadius: 18, borderWidth: StyleSheet.hairlineWidth, overflow: "hidden", shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 1 },
   fieldRow: { flexDirection: "row", alignItems: "flex-start", gap: 14, padding: 16 },
   fieldIcon: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", marginTop: 2 },

@@ -15,6 +15,16 @@ export const API_URL =
 
 export const SOCKET_URL = API_URL;
 
+/**
+ * Paid / always-on Render (no cold starts).
+ * Set EXPO_PUBLIC_SERVER_ALWAYS_ON=true in EAS env, or set SERVER_ALWAYS_ON=true on Render
+ * (app learns from GET /health → always_on).
+ */
+export function isServerAlwaysOnEnv(): boolean {
+  const v = (process.env.EXPO_PUBLIC_SERVER_ALWAYS_ON as string | undefined)?.trim().toLowerCase();
+  return v === 'true' || v === '1';
+}
+
 export const COLORS = {
   primary: '#E8751A',
   primaryLight: '#F5A95A',

@@ -8,4 +8,5 @@ GoogleService-Info.plist
 dist/
 *.log
 *.md
+!README.md
 .DS_Store

@@ -1,7 +1,12 @@
-# Env and secrets
+# Env and secrets (never commit — examples stay local only)
 .env
 .env.*
 .env.example
+**/.env.example
+env.example
+**/.env.sample
+**/.env.local
+**/.env.*.local
 
 # Sensitive files
 **/serviceAccountKey.json
@@ -13,8 +18,12 @@
 *.p12
 *.pfx
 
-# Docs (user preference)
+# Docs — ignore all markdown except root README
 *.md
+!README.md
+
+# IDE / local session notes
+.cursor/
 
 # Dependencies and build
 node_modules/

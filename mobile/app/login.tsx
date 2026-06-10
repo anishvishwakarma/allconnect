@@ -24,7 +24,7 @@ import {
 } from "../components/GoogleSignInSection";
 import { useAppTheme } from "../context/ThemeContext";
 import { useAlert } from "../context/AlertContext";
-import { API_URL } from "../constants/config";
+import { ConnectingOverlay } from "../components/ConnectingOverlay";
 import { useAppInsets } from "../hooks/useAppInsets";
 import { authApi } from "../services/api";
 import { useAuthStore } from "../store/auth";
@@ -68,7 +68,6 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [loadingHint, setLoadingHint] = useState("");
   const [googleMobileGate, setGoogleMobileGate] = useState(false);
   const [googleMobileInput, setGoogleMobileInput] = useState("");
   const pendingGoogleUserRef = useRef<FirebaseUser | null>(null);
@@ -87,15 +86,6 @@ export default function LoginScreen() {
       () => bumpScrollToEnd()
     );
     return () => sub.remove();
-  }, []);
-
-    // Pre-wake server (Render cold start) when login screen mounts
-  useEffect(() => {
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 8000);
-    fetch(`${API_URL}/health`, { method: "GET", signal: ctrl.signal })
-      .catch(() => {})
-      .finally(() => clearTimeout(t));
   }, []);
 
   useEffect(() => {
@@ -126,11 +116,8 @@ export default function LoginScreen() {
       return;
     }
     setLoading(true);
-    setLoadingHint("");
-    const hintTimer = setTimeout(() => setLoadingHint("Taking longer? Server may be waking up…"), 4000);
     try {
       const cred = await signInWithEmail(e, p);
-      setLoadingHint("Almost there…");
       const idToken = await getIdToken(cred.user);
       const { token, user } = await authApi.firebaseLogin(idToken);
       setAuth(token, user);
@@ -179,9 +166,7 @@ export default function LoginScreen() {
       else
         alert.show("Sign in failed", msg || "Check your connection and try again.", undefined, "error");
     } finally {
-      clearTimeout(hintTimer);
       setLoading(false);
-      setLoadingHint("");
     }
   }
 
@@ -207,11 +192,8 @@ export default function LoginScreen() {
       return;
     }
     setLoading(true);
-    setLoadingHint("");
-    const hintTimer = setTimeout(() => setLoadingHint("Taking longer? Server may be waking up…"), 4000);
     try {
       const cred = await signUpWithEmail(e, p);
-      setLoadingHint("Almost there…");
       const idToken = await getIdToken(cred.user);
       const { token, user } = await authApi.firebaseLogin(idToken, mob); // mobile linked to email for messaging
       setAuth(token, user);
@@ -274,16 +256,13 @@ export default function LoginScreen() {
       else
         alert.show("Something went wrong", msg || "Check your connection and try again.", undefined, "error");
     } finally {
-      clearTimeout(hintTimer);
       setLoading(false);
-      setLoadingHint("");
     }
   }
 
   const onGoogleIdToken = useCallback(
     async (idToken: string) => {
       setLoading(true);
-      setLoadingHint("");
       try {
         const cred = await signInWithGoogleIdToken(idToken);
         const idTok = await getIdToken(cred.user);
@@ -405,6 +384,7 @@ export default function LoginScreen() {
 
   return (
     <View style={[s.root, { backgroundColor: bg, paddingTop: top }]}>
+      <ConnectingOverlay visible={loading} kind={mode === "forgot" ? "email" : "server"} />
       <StatusBar style={isDark ? "light" : "dark"} />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -614,9 +594,6 @@ export default function LoginScreen() {
                     </>
                   )}
                 </TouchableOpacity>
-                {loadingHint ? (
-                  <Text style={[s.loadingHint, { color: subColor }]}>{loadingHint}</Text>
-                ) : null}
               </View>
             ) : (
               <View>
@@ -638,9 +615,6 @@ export default function LoginScreen() {
                     </>
                   )}
                 </TouchableOpacity>
-                {loadingHint ? (
-                  <Text style={[s.loadingHint, { color: subColor }]}>{loadingHint}</Text>
-                ) : null}
               </View>
             )}
 
@@ -781,7 +755,6 @@ const s = StyleSheet.create({
     elevation: 3,
   },
   primaryButtonText: { color: "#fff", fontSize: 17, fontWeight: "700" },
-  loadingHint: { fontSize: 12, marginTop: 10, textAlign: "center" },
   switchMode: {
     flexDirection: "row",
     flexWrap: "wrap",

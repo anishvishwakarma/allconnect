@@ -50,7 +50,10 @@ app.use(cors({ origin: corsOrigin }));
 app.use(express.json({ limit: '10mb' }));
 app.use(apiNoCacheAndRequestId);
 
-app.get('/health', rateLimitHealth, (req, res) => res.json({ ok: true }));
+app.get('/health', rateLimitHealth, (req, res) => {
+  const alwaysOn = process.env.SERVER_ALWAYS_ON === 'true';
+  res.json({ ok: true, always_on: alwaysOn });
+});
 app.get('/', (req, res) => res.json({ name: 'AllConnect API', health: '/health' }));
 
 app.use('/api', rateLimitApiGlobal);

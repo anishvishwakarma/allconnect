@@ -1,4 +1,5 @@
 import { Redirect } from "expo-router";
+import { AppBootScreen } from "../components/AppBootScreen";
 import { useAuthStore } from "../store/auth";
 
 export default function Index() {
@@ -6,7 +7,7 @@ export default function Index() {
   const user = useAuthStore((s) => s.user);
   const hasHydrated = useAuthStore((s) => s.hasHydrated);
 
-  if (!hasHydrated) return null;
+  if (!hasHydrated) return <AppBootScreen />;
 
   if (token) {
     const hasName = !!(user?.name && user.name.trim());
