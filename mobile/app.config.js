@@ -91,7 +91,7 @@ module.exports = {
     },
     slug: "allconnect",
     owner: "allpixel-technologies-main",
-    version: "1.1.6",
+    version: "1.1.7",
     /** Default on Android (Play large-screen policy); iOS portrait via infoPlist + runtime lock. */
     orientation: "default",
     icon: "./assets/icon.png",
@@ -105,7 +105,7 @@ module.exports = {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.allconnect.app",
-      buildNumber: "8",
+      buildNumber: "9",
       config: { googleMapsApiKey: mapsApiKeyIos },
       infoPlist: {
         NSPhotoLibraryUsageDescription: "AllConnect needs photo access to set your profile picture.",
@@ -121,7 +121,7 @@ module.exports = {
         backgroundColor: "#E8751A",
       },
       package: "com.allconnect.app",
-      versionCode: 8,
+      versionCode: 9,
       /** Lets the window shrink when the keyboard opens so ScrollView can reach password / buttons. */
       softwareKeyboardLayoutMode: "resize",
       config: {

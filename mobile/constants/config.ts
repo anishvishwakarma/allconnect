@@ -84,6 +84,9 @@ export const TAB_ITEM_LIFT_UP = 3;
 export const MAP_UI_BOTTOM_GAP = 12;
 export const MAP_LOCATE_FAB_BOTTOM = 20;
 
+/** Lift locate FAB above map toolbar (Google Directions / Open in Maps). iOS + Android. */
+export const MAP_GOOGLE_TOOLBAR_CLEARANCE = 53;
+
 /** Max content width on tablets / wide phones — keeps forms readable, centered. */
 export const MAX_SCREEN_CONTENT_WIDTH = 720;
 

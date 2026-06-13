@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   ActivityIndicator, TextInput,
-  Platform,
+  Platform, PanResponder,
 } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE, MapMarkerProps } from "react-native-maps";
 // Workaround: react-native-maps types omit React's built-in `key` prop
@@ -16,6 +16,7 @@ import { useAppTheme } from "../../context/ThemeContext";
 import { useAlert } from "../../context/AlertContext";
 import {
   CATEGORY_COLORS,
+  MAP_GOOGLE_TOOLBAR_CLEARANCE,
   MAP_LOCATE_FAB_BOTTOM,
   MAP_UI_BOTTOM_GAP,
 } from "../../constants/config";
@@ -321,6 +322,33 @@ export default function MapScreen() {
   const lastPinIdsRef = useRef<Set<string>>(new Set());
   const freshPinsClearRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [freshPinIds, setFreshPinIds] = useState<Set<string>>(new Set());
+  const [pinCardHeight, setPinCardHeight] = useState(0);
+  const [cardDragY, setCardDragY] = useState(0);
+
+  const closePinCard = useCallback(() => {
+    setCardDragY(0);
+    setPinCardHeight(0);
+    setSelectedPin(null);
+  }, []);
+
+  const pinPan = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, g) => g.dy > 8 && Math.abs(g.dy) > Math.abs(g.dx),
+      onPanResponderMove: (_, g) => {
+        if (g.dy > 0) setCardDragY(Math.min(g.dy, 220));
+      },
+      onPanResponderRelease: (_, g) => {
+        if (g.dy > 64 || (g.vy ?? 0) > 0.6) {
+          setCardDragY(0);
+          setPinCardHeight(0);
+          setSelectedPin(null);
+        } else {
+          setCardDragY(0);
+        }
+      },
+      onPanResponderTerminate: () => setCardDragY(0),
+    })
+  ).current;
 
   function regionChangedSignificantly(
     a: { latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number },
@@ -481,6 +509,7 @@ export default function MapScreen() {
   const selectPin = useCallback((pin: (typeof pins)[number]) => {
     lastPinTapAtRef.current = Date.now();
     setDraftPin(null);
+    setCardDragY(0);
     setSelectedPin(pin);
     const postId = String(pin.id);
     const isHost = pin.host_id === user?.id || pin.hostId === user?.id;
@@ -617,9 +646,16 @@ export default function MapScreen() {
     ? resolveMarkerIconFromTitle(selectedPin.title, selectedPin.category)
     : "location";
 
-  /** Map view ends above tab bar — small bottom gap only (tabBarHeight would push controls too high). */
-  const mapBottomPadding = selectedPin ? 200 : draftPin ? 96 : MAP_UI_BOTTOM_GAP;
-  const locateFabBottom = selectedPin ? 220 : MAP_LOCATE_FAB_BOTTOM;
+  /** Pin card sits flush above tab bar; map padding follows measured card height. */
+  const mapBottomPadding = selectedPin
+    ? (pinCardHeight > 0 ? pinCardHeight + 8 : 180)
+    : draftPin
+      ? 96
+      : MAP_UI_BOTTOM_GAP;
+  /** Sit above map toolbar; pin card open: also lift above the preview sheet. */
+  const locateFabBottom = selectedPin
+    ? (pinCardHeight > 0 ? pinCardHeight + 16 : 200) + MAP_GOOGLE_TOOLBAR_CLEARANCE
+    : MAP_LOCATE_FAB_BOTTOM + MAP_GOOGLE_TOOLBAR_CLEARANCE;
 
   return (
     <View style={{ flex: 1, backgroundColor: bg }}>
@@ -874,7 +910,21 @@ export default function MapScreen() {
 
       {/* ── Pin detail card (above tab bar so View Details is fully visible) ── */}
       {selectedPin && (
-        <View style={[s.pinCard, { backgroundColor: surface, borderColor: border, bottom: MAP_UI_BOTTOM_GAP, left, right }]}>
+        <View
+          {...pinPan.panHandlers}
+          onLayout={(e) => setPinCardHeight(e.nativeEvent.layout.height)}
+          style={[
+            s.pinCard,
+            {
+              backgroundColor: surface,
+              borderColor: border,
+              bottom: 0,
+              paddingLeft: Math.max(left, 20),
+              paddingRight: Math.max(right, 20),
+              transform: [{ translateY: cardDragY }],
+            },
+          ]}
+        >
           <View style={s.handle} />
           <View style={{ flexDirection: "row", alignItems: "flex-start", marginBottom: 12 }}>
             <View style={[s.pinTitleIconBox, { backgroundColor: selectedDetailCat + "24" }]}>
@@ -888,7 +938,7 @@ export default function MapScreen() {
                 </Text>
               </View>
             </View>
-            <TouchableOpacity onPress={() => setSelectedPin(null)} style={[s.closeBtn, { backgroundColor: isDark ? "#2C2C2F" : "#F0F0F3" }]}>
+            <TouchableOpacity onPress={closePinCard} style={[s.closeBtn, { backgroundColor: isDark ? "#2C2C2F" : "#F0F0F3" }]}>
               <Ionicons name="close" size={16} color={sub} />
             </TouchableOpacity>
           </View>
@@ -992,7 +1042,7 @@ export default function MapScreen() {
         </View>
       )}
       {draftPin && !selectedPin && (
-        <View style={[s.draftCard, { backgroundColor: surface, borderColor: border, bottom: 88, marginHorizontal: Math.max(left, 16) }]}>
+        <View style={[s.draftCard, { backgroundColor: surface, borderColor: border, bottom: 0, left: Math.max(left, 16), right: Math.max(right, 16) }]}>
           <Text style={[s.draftTitle, { color: text }]}>Create post here?</Text>
           <Text style={[s.draftSub, { color: sub }]}>
             Long-pressed location on the map. You can fine-tune details on the next screen.
@@ -1116,11 +1166,11 @@ const s = StyleSheet.create({
   pinCard: {
     position: "absolute", left: 0, right: 0,
     borderTopLeftRadius: 28, borderTopRightRadius: 28,
-    padding: 20, paddingBottom: 48,
+    paddingTop: 12, paddingBottom: 16,
     borderTopWidth: StyleSheet.hairlineWidth,
     shadowColor: "#000", shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 20,
   },
-  handle: { width: 40, height: 4, borderRadius: 2, backgroundColor: "#AEAEB2", alignSelf: "center", marginBottom: 16 },
+  handle: { width: 40, height: 4, borderRadius: 2, backgroundColor: "#AEAEB2", alignSelf: "center", marginBottom: 14 },
   pinTitleIconBox: {
     width: 44,
     height: 44,
