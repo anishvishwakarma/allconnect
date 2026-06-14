@@ -116,6 +116,12 @@ module.exports = {
     },
     android: {
       ...(resolvedGoogleServicesFile ? { googleServicesFile: resolvedGoogleServicesFile } : {}),
+      /** Android 15+ edge-to-edge (Play policy). Safe areas already handled in app code. */
+      edgeToEdgeEnabled: true,
+      /** Keep system nav contrast scrim (same look as now on 3-button nav). Do not set backgroundColor. */
+      androidNavigationBar: {
+        enforceContrast: true,
+      },
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#E8751A",
@@ -133,6 +139,7 @@ module.exports = {
         "expo-build-properties",
         {
           android: {
+            /** DayNight + edge-to-edge theme; transparent system bars in native styles.xml */
             useDayNightTheme: true,
           },
         },

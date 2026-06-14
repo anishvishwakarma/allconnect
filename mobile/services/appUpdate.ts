@@ -1,10 +1,14 @@
 import { Linking, Platform } from "react-native";
 import Constants from "expo-constants";
+import * as Application from "expo-application";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_URL } from "../constants/config";
 import type { AlertButton } from "../components/AppAlert";
 
 const DISMISS_STORAGE_KEY = "allconnect_update_prompt_dismissed";
+const UPDATE_TITLE = "Update available";
+const UPDATE_REQUIRED_TITLE = "Update required";
+const UPDATE_MESSAGE = "A new version is available. Please update.";
 
 export type AppVersionPayload = {
   latest_version: string;
@@ -12,7 +16,8 @@ export type AppVersionPayload = {
   min_version_android?: string;
   min_version_ios?: string;
   force_update?: boolean;
-  message: string;
+  message?: string;
+  store_url?: string;
   store_url_android: string;
   store_url_ios: string;
 };
@@ -43,6 +48,7 @@ export function isVersionOlder(current: string, required: string): boolean {
 
 export function getInstalledAppVersion(): string {
   return (
+    Application.nativeApplicationVersion ||
     Constants.nativeAppVersion ||
     Constants.expoConfig?.version ||
     "0.0.0"
@@ -50,6 +56,8 @@ export function getInstalledAppVersion(): string {
 }
 
 function storeUrlForPlatform(payload: AppVersionPayload): string | null {
+  const direct = (payload.store_url || "").trim();
+  if (direct) return direct;
   if (Platform.OS === "ios") {
     const url = (payload.store_url_ios || "").trim();
     return url || null;
@@ -100,7 +108,7 @@ export async function maybePromptAppUpdate(show: ShowAlert): Promise<void> {
   if (!payload) return;
 
   const current = getInstalledAppVersion();
-  const minRequired = (payload.min_version || payload.latest_version || "").trim();
+  const minRequired = (payload.min_version || "").trim();
   const latest = (payload.latest_version || minRequired).trim();
   if (!minRequired && !latest) return;
 
@@ -110,33 +118,27 @@ export async function maybePromptAppUpdate(show: ShowAlert): Promise<void> {
 
   const force = Boolean(payload.force_update) || belowMin;
   const storeUrl = storeUrlForPlatform(payload);
-  const title = force ? "Update required" : "Update available";
-  const message =
-    payload.message ||
-    (force
-      ? `AllConnect ${latest} is required. You are on ${current}.`
-      : `AllConnect ${latest} is available. You are on ${current}.`);
 
   if (!force) {
     const dismissed = await AsyncStorage.getItem(DISMISS_STORAGE_KEY);
     if (dismissed === latest) return;
   }
 
-  const updateBtn: AlertButton = {
-    text: "Update now",
+  const downloadBtn: AlertButton = {
+    text: "Download",
     onPress: () => {
       void openStore(storeUrl);
     },
   };
 
   if (force) {
-    show(title, message, storeUrl ? [updateBtn] : [{ text: "OK" }], "info");
+    show(UPDATE_REQUIRED_TITLE, UPDATE_MESSAGE, storeUrl ? [downloadBtn] : [{ text: "OK" }], "info");
     return;
   }
 
   show(
-    title,
-    message,
+    UPDATE_TITLE,
+    UPDATE_MESSAGE,
     [
       {
         text: "Later",
@@ -145,7 +147,7 @@ export async function maybePromptAppUpdate(show: ShowAlert): Promise<void> {
           void AsyncStorage.setItem(DISMISS_STORAGE_KEY, latest);
         },
       },
-      ...(storeUrl ? [updateBtn] : []),
+      ...(storeUrl ? [downloadBtn] : []),
     ],
     "info"
   );
