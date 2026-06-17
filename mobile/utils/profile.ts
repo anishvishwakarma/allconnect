@@ -10,3 +10,9 @@ export function getInitials(name: string | undefined | null): string {
   }
   return name.slice(0, 2).toUpperCase();
 }
+
+/** Remote avatar URL for Image — local file:// URIs pass through unchanged. */
+export function avatarImageUri(uri: string | null | undefined): string | undefined {
+  if (!uri) return undefined;
+  return uri;
+}

@@ -16,7 +16,7 @@ import { getFooterBottomInset } from "../../constants/config";
 import { useAppTheme } from "../../context/ThemeContext";
 import { useAlert } from "../../context/AlertContext";
 import { useBadgeStore } from "../../store/badges";
-import { getInitials } from "../../utils/profile";
+import { avatarImageUri, getInitials } from "../../utils/profile";
 import type { ChatMember } from "../../types";
 
 const PRIMARY = "#E8751A";
@@ -423,9 +423,11 @@ function ChatAvatar({ uri, name, size }: { uri?: string | null; name?: string | 
   useEffect(() => { setImgFailed(false); }, [uri]);
   const initial = getInitials(name);
   if (uri && !imgFailed) {
+    const src = avatarImageUri(uri);
     return (
       <Image
-        source={{ uri }}
+        key={src}
+        source={{ uri: src }}
         style={{ width: size, height: size, borderRadius: size / 2 }}
         onError={() => setImgFailed(true)}
       />

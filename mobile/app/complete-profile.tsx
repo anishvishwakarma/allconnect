@@ -14,7 +14,7 @@ import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuthStore } from "../store/auth";
 import { usersApi } from "../services/api";
-import { getInitials } from "../utils/profile";
+import { avatarImageUri, getInitials } from "../utils/profile";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getBottomInset, getTopInset } from "../constants/config";
 import { useAppTheme } from "../context/ThemeContext";
@@ -31,6 +31,7 @@ export default function CompleteProfileScreen() {
   const [email, setEmail] = useState(user?.email?.trim() || "");
   const [avatarUri, setAvatarUri] = useState<string | null>(user?.avatar_uri || null);
   const [avatarBase64, setAvatarBase64] = useState<string | null>(null);
+  const [savedAvatarUri, setSavedAvatarUri] = useState<string | null>(user?.avatar_uri || null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -76,7 +77,9 @@ export default function CompleteProfileScreen() {
       const { avatar_uri } = await usersApi.uploadAvatar(avatarBase64);
       if (avatar_uri) {
         setAvatarUri(avatar_uri);
+        setSavedAvatarUri(avatar_uri);
         setAvatarBase64(null);
+        updateUser({ avatar_uri });
         alert.show("Uploaded", "Photo uploaded. Tap Continue to save your profile.", undefined, "success");
       } else {
         alert.show("Upload failed", "No URL returned. Try again.", undefined, "error");
@@ -98,22 +101,24 @@ export default function CompleteProfileScreen() {
     }
     setSaving(true);
     try {
-      let finalAvatarUri = user?.avatar_uri || null;
+      let finalAvatarUri = savedAvatarUri;
       if (avatarBase64) {
         const res = await usersApi.uploadAvatar(avatarBase64);
         finalAvatarUri = res?.avatar_uri ?? null;
         if (finalAvatarUri) {
           setAvatarUri(finalAvatarUri);
+          setSavedAvatarUri(finalAvatarUri);
           setAvatarBase64(null);
         }
       }
       const u = await usersApi.update({
         name: trimmedName,
-        avatar_uri: finalAvatarUri ?? undefined,
+        ...(finalAvatarUri ? { avatar_uri: finalAvatarUri } : {}),
       });
+      const resolvedAvatar = finalAvatarUri ?? u.avatar_uri ?? null;
       updateUser({
         ...u,
-        avatar_uri: finalAvatarUri ?? (u as { avatar_uri?: string })?.avatar_uri,
+        avatar_uri: resolvedAvatar,
       });
       router.replace("/(tabs)/map");
     } catch (err: any) {
@@ -131,6 +136,7 @@ export default function CompleteProfileScreen() {
   }
 
   const initial = getInitials(name || user?.name);
+  const displayAvatarUri = avatarImageUri(avatarUri);
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: bg }} contentContainerStyle={[s.content, { paddingTop: getTopInset(insets.top) + 24, paddingBottom: getBottomInset(insets.bottom) + 24 }]} keyboardShouldPersistTaps="handled">
@@ -139,8 +145,8 @@ export default function CompleteProfileScreen() {
 
       <View style={s.avatarContainer}>
         <TouchableOpacity onPress={pickImage} style={[s.avatarWrap, { borderColor: border, backgroundColor: surface }]}>
-          {avatarUri ? (
-            <Image source={{ uri: avatarUri }} style={s.avatarImage} />
+          {displayAvatarUri ? (
+            <Image key={displayAvatarUri} source={{ uri: displayAvatarUri }} style={s.avatarImage} />
           ) : (
             <View style={[s.avatarPlaceholder, { backgroundColor: PRIMARY + "20" }]}>
               <Text style={[s.avatarInitial, { color: PRIMARY }]}>{initial}</Text>

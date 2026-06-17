@@ -1,15 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   View, Text, TextInput, TouchableOpacity, ActivityIndicator,
   ScrollView, StyleSheet, Image,
 } from "react-native";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { usersApi } from "../../services/api";
 import { useAuthStore } from "../../store/auth";
 import { useBadgeStore } from "../../store/badges";
 import { disconnectSocket } from "../../services/socket";
-import { getInitials } from "../../utils/profile";
+import { getInitials, avatarImageUri } from "../../utils/profile";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getBottomInset, getTopInset, FREE_POST_LIMIT } from "../../constants/config";
 import { useAppTheme } from "../../context/ThemeContext";
@@ -38,6 +38,13 @@ export default function ProfileScreen() {
     if (!token) return;
     usersApi.me().then((u) => { updateUser(u); setName(u.name || ""); setEmail(u.email || ""); }).catch(() => {});
   }, [token]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!token) return;
+      usersApi.me().then(updateUser).catch(() => {});
+    }, [token, updateUser])
+  );
 
   useEffect(() => {
     if (!token) return;
@@ -120,7 +127,7 @@ export default function ProfileScreen() {
       <View style={s.avatarSection}>
         <View style={[s.avatarRing, { borderColor: PRIMARY }]}>
           {user?.avatar_uri ? (
-            <Image source={{ uri: user.avatar_uri }} style={s.avatarImage} />
+            <Image key={user.avatar_uri} source={{ uri: avatarImageUri(user.avatar_uri)! }} style={s.avatarImage} />
           ) : (
             <View style={[s.avatar, { backgroundColor: PRIMARY + "18" }]}>
               <Text style={[s.avatarText, { color: PRIMARY }]}>{initial}</Text>

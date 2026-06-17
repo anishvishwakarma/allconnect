@@ -20,6 +20,13 @@ function getSupabase() {
 const BUCKET = 'avatars';
 const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 
+/** Same storage path on re-upload — append version so clients fetch the new image. */
+function withCacheBust(publicUrl) {
+  if (!publicUrl) return null;
+  const base = String(publicUrl).split('?')[0];
+  return `${base}?v=${Date.now()}`;
+}
+
 /**
  * Upload base64 image to Supabase Storage, return public URL.
  * @param {string} userId - User ID for path
@@ -60,7 +67,7 @@ async function uploadAvatar(userId, base64Data) {
     throw new Error('Upload failed. Storage response invalid.');
   }
   const { data: urlData } = client.storage.from(BUCKET).getPublicUrl(upPath);
-  return urlData?.publicUrl || null;
+  return withCacheBust(urlData?.publicUrl || null);
 }
 
 module.exports = { uploadAvatar, getSupabase };

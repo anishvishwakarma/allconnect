@@ -14,7 +14,7 @@ import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuthStore } from "../../store/auth";
 import { usersApi } from "../../services/api";
-import { getInitials } from "../../utils/profile";
+import { avatarImageUri, getInitials } from "../../utils/profile";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getBottomInset, getTopInset } from "../../constants/config";
 import { useAppTheme } from "../../context/ThemeContext";
@@ -32,6 +32,8 @@ export default function EditProfileScreen() {
   const [email, setEmail] = useState("");
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [avatarBase64, setAvatarBase64] = useState<string | null>(null);
+  /** Last avatar URL confirmed on server (upload or load) — used on Save. */
+  const [savedAvatarUri, setSavedAvatarUri] = useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [saving, setSaving] = useState(false);
   const { isDark } = useAppTheme();
@@ -49,15 +51,15 @@ export default function EditProfileScreen() {
       router.replace("/login");
       return;
     }
-    setName(user?.name || "");
-    setEmail(user?.email || "");
-    setAvatarUri(user?.avatar_uri || null);
     usersApi.me().then((u) => {
       setName(u.name || "");
       setEmail(u.email || "");
-      setAvatarUri(u.avatar_uri || null);
+      const uri = u.avatar_uri || null;
+      setAvatarUri(uri);
+      setSavedAvatarUri(uri);
+      updateUser(u);
     }).catch(() => {});
-  }, [hasHydrated, token, user?.name, user?.email, user?.avatar_uri]);
+  }, [hasHydrated, token, updateUser]);
 
   async function pickImage() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -86,6 +88,7 @@ export default function EditProfileScreen() {
       const { avatar_uri } = await usersApi.uploadAvatar(avatarBase64);
       if (avatar_uri) {
         setAvatarUri(avatar_uri);
+        setSavedAvatarUri(avatar_uri);
         setAvatarBase64(null);
         updateUser({ avatar_uri });
         alert.show("Uploaded", "Photo uploaded. Tap Save to update your profile.", undefined, "success");
@@ -105,20 +108,24 @@ export default function EditProfileScreen() {
     if (!token) return;
     setSaving(true);
     try {
-      let avatarUrl = user?.avatar_uri || null;
+      let avatarUrl = savedAvatarUri;
       if (avatarBase64) {
         const res = await usersApi.uploadAvatar(avatarBase64);
         avatarUrl = res?.avatar_uri ?? null;
         if (avatarUrl) {
           setAvatarUri(avatarUrl);
+          setSavedAvatarUri(avatarUrl);
           setAvatarBase64(null);
         }
       }
       const u = await usersApi.update({
         name: name.trim() || undefined,
-        avatar_uri: avatarUrl ?? undefined,
+        ...(avatarUrl ? { avatar_uri: avatarUrl } : {}),
       });
-      updateUser({ ...u, avatar_uri: avatarUrl ?? (u as { avatar_uri?: string })?.avatar_uri });
+      const finalAvatar = avatarUrl ?? u.avatar_uri ?? null;
+      updateUser({ ...u, avatar_uri: finalAvatar });
+      setSavedAvatarUri(finalAvatar);
+      setAvatarUri(finalAvatar);
       alert.show("Saved", "Profile updated.", undefined, "success");
       router.back();
     } catch (err: any) {
@@ -136,6 +143,7 @@ export default function EditProfileScreen() {
   }
 
   const initial = getInitials(name || user?.name);
+  const displayAvatarUri = avatarImageUri(avatarUri);
 
   return (
     <ScrollView style={[s.scroll, { backgroundColor: bg }]} contentContainerStyle={[s.content, { paddingTop: getTopInset(insets.top) + 16, paddingBottom: getBottomInset(insets.bottom) + 24 }]}>
@@ -143,8 +151,8 @@ export default function EditProfileScreen() {
 
       <View style={s.avatarContainer}>
         <TouchableOpacity onPress={pickImage} style={[s.avatarWrap, { borderColor: border, backgroundColor: surface }]}>
-          {avatarUri ? (
-            <Image source={{ uri: avatarUri }} style={s.avatarImage} />
+          {displayAvatarUri ? (
+            <Image key={displayAvatarUri} source={{ uri: displayAvatarUri }} style={s.avatarImage} />
           ) : (
             <View style={[s.avatarPlaceholder, { backgroundColor: PRIMARY + "20" }]}>
               <Text style={[s.avatarInitial, { color: PRIMARY }]}>{initial}</Text>
