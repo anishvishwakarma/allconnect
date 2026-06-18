@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   View, Text, TextInput, ScrollView, TouchableOpacity,
   ActivityIndicator, KeyboardAvoidingView, Platform,
@@ -18,6 +18,22 @@ import { useAlert } from "../../context/AlertContext";
 
 const PRIMARY = "#E8751A";
 
+const DEFAULT_DURATION = "60";
+const DEFAULT_COST = "0";
+const DEFAULT_MAX_PEOPLE = "4";
+
+function paramString(v: string | string[] | undefined): string | undefined {
+  if (Array.isArray(v)) return v[0];
+  return v;
+}
+
+function parseMapPinParams(params: { lat?: string | string[]; lng?: string | string[] }) {
+  const lat = parseFloat(paramString(params.lat) ?? "");
+  const lng = parseFloat(paramString(params.lng) ?? "");
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return { lat, lng };
+}
+
 const EVENT_LIKE_CATEGORIES = new Set(["activity", "event", "meetup", "nightlife", "study"]);
 function getDurationLabel(cat: string): string {
   if (cat === "selling") return "How long available (min)";
@@ -34,7 +50,7 @@ function getDurationHint(cat: string): string {
 
 export default function CreatePostScreen() {
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ lat?: string; lng?: string }>();
+  const params = useLocalSearchParams<{ lat?: string; lng?: string; mapSession?: string }>();
   const token = useAuthStore((s) => s.token);
   const user = useAuthStore((s) => s.user);
   const updateUser = useAuthStore((s) => s.updateUser);
@@ -46,14 +62,14 @@ export default function CreatePostScreen() {
   const [description, setDescription] = useState("");
   const [addressText, setAddressText] = useState("");
   const [eventAt, setEventAt] = useState<Date | null>(null);
-  const [durationMinutes, setDurationMinutes] = useState("60");
-  const [costPerPerson, setCostPerPerson] = useState("0");
-  const [maxParticipants, setMaxParticipants] = useState("4");
+  const [durationMinutes, setDurationMinutes] = useState(DEFAULT_DURATION);
+  const [costPerPerson, setCostPerPerson] = useState(DEFAULT_COST);
+  const [maxParticipants, setMaxParticipants] = useState(DEFAULT_MAX_PEOPLE);
   const [approvalRequired, setApprovalRequired] = useState(true);
-  const initialLat = typeof params.lat === "string" ? parseFloat(params.lat) : NaN;
-  const initialLng = typeof params.lng === "string" ? parseFloat(params.lng) : NaN;
-  const [lat, setLat] = useState<number | null>(!isNaN(initialLat) ? initialLat : null);
-  const [lng, setLng] = useState<number | null>(!isNaN(initialLng) ? initialLng : null);
+  const mapPin = parseMapPinParams(params);
+  const [lat, setLat] = useState<number | null>(mapPin?.lat ?? null);
+  const [lng, setLng] = useState<number | null>(mapPin?.lng ?? null);
+  const appliedMapSessionRef = useRef<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [fetchingLoc, setFetchingLoc] = useState(false);
   const [locationQuery, setLocationQuery] = useState("");
@@ -75,6 +91,47 @@ export default function CreatePostScreen() {
   const subEnd = user?.subscription_ends_at;
   const freeRemaining = Math.max(0, FREE_POST_LIMIT - postsMonth);
   const hasSubscription = subEnd && new Date(subEnd) > new Date();
+
+  const resetFormFields = useCallback(() => {
+    setTitle("");
+    setCategory("");
+    setDescription("");
+    setAddressText("");
+    setEventAt(null);
+    setDurationMinutes(DEFAULT_DURATION);
+    setCostPerPerson(DEFAULT_COST);
+    setMaxParticipants(DEFAULT_MAX_PEOPLE);
+    setApprovalRequired(true);
+    setLocationQuery("");
+    setPlaceResults([]);
+    setShowDatePicker(false);
+    setShowTimePicker(false);
+  }, []);
+
+  const applyMapPinLocation = useCallback(async (pinLat: number, pinLng: number) => {
+    setLat(pinLat);
+    setLng(pinLng);
+    setAddressText("");
+    try {
+      const [geo] = await Location.reverseGeocodeAsync({ latitude: pinLat, longitude: pinLng });
+      if (geo) {
+        setAddressText([geo.street, geo.district, geo.city].filter(Boolean).join(", "));
+      }
+    } catch {
+      /* optional address label */
+    }
+  }, []);
+
+  /** Fresh form when opening Post from a new map long-press (tab screen keeps state otherwise). */
+  useEffect(() => {
+    const session = paramString(params.mapSession);
+    const pin = parseMapPinParams(params);
+    if (!session || !pin) return;
+    if (appliedMapSessionRef.current === session) return;
+    appliedMapSessionRef.current = session;
+    resetFormFields();
+    void applyMapPinLocation(pin.lat, pin.lng);
+  }, [params.mapSession, params.lat, params.lng, resetFormFields, applyMapPinLocation]);
 
   function formatEventDate(value: Date | null) {
     if (!value) return "Choose date";
@@ -240,6 +297,11 @@ export default function CreatePostScreen() {
         { text: "View Post", onPress: () => router.push(`/post/${post.id}`) },
         { text: "Explore Map", onPress: () => router.replace("/(tabs)/map") },
       ], "success");
+      resetFormFields();
+      setLat(null);
+      setLng(null);
+      appliedMapSessionRef.current = null;
+      router.setParams({ lat: "", lng: "", mapSession: "" });
     } catch (err: any) {
       alert.show("Something went wrong", "Could not create post. Please try again.", undefined, "error");
     } finally { setLoading(false); }

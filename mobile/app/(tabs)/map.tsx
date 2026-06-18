@@ -1042,7 +1042,7 @@ export default function MapScreen() {
         </View>
       )}
       {draftPin && !selectedPin && (
-        <View style={[s.draftCard, { backgroundColor: surface, borderColor: border, bottom: 0, left: Math.max(left, 16), right: Math.max(right, 16) }]}>
+        <View style={[s.draftCard, { backgroundColor: surface, borderColor: border, bottom: MAP_UI_BOTTOM_GAP, left: Math.max(left, 16), right: Math.max(right, 16) }]}>
           <Text style={[s.draftTitle, { color: text }]}>Create post here?</Text>
           <Text style={[s.draftSub, { color: sub }]}>
             Long-pressed location on the map. You can fine-tune details on the next screen.
@@ -1080,6 +1080,7 @@ export default function MapScreen() {
                   params: {
                     lat: String(coord.latitude),
                     lng: String(coord.longitude),
+                    mapSession: String(Date.now()),
                   },
                 });
               }}
