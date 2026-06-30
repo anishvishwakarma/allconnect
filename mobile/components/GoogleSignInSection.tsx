@@ -12,6 +12,10 @@ WebBrowser.maybeCompleteAuthSession();
 /** Shown when Google OAuth is unavailable — never expose DEVELOPER_ERROR / setup text to users. */
 export const GOOGLE_SIGNIN_UNAVAILABLE_MSG =
   "Google sign-in is coming in the next update. Please use email sign-in for now.";
+const GOOGLE_SIGNIN_SETUP_MSG =
+  "Google sign-in is not fully configured yet. Please use email sign-in for now.";
+const GOOGLE_PLAY_SERVICES_MSG =
+  "Google Play Services is required for Google sign-in. Please update it and try again.";
 
 export type GoogleOAuthExtra = {
   webClientId?: string;
@@ -63,9 +67,35 @@ function isSignInCancelled(e: unknown): boolean {
   return code === "SIGN_IN_CANCELLED" || code === "12501";
 }
 
+function googleErrorCode(e: unknown): string {
+  if (!e || typeof e !== "object") return "";
+  const obj = e as { code?: unknown; message?: unknown };
+  return String(obj.code || obj.message || "").trim();
+}
+
+function googleErrorMessage(e: unknown): string {
+  const code = googleErrorCode(e);
+  if (
+    code.includes("DEVELOPER_ERROR") ||
+    code === "10" ||
+    code.includes("12500") ||
+    code.includes("redirect_uri_mismatch") ||
+    code.includes("invalid_client")
+  ) {
+    return GOOGLE_SIGNIN_SETUP_MSG;
+  }
+  if (code.includes("PLAY_SERVICES") || code.includes("Google Play services")) {
+    return GOOGLE_PLAY_SERVICES_MSG;
+  }
+  return GOOGLE_SIGNIN_UNAVAILABLE_MSG;
+}
+
 function notifyGoogleError(onError: ((message: string) => void) | undefined, e?: unknown) {
   if (e && isSignInCancelled(e)) return;
-  onError?.(GOOGLE_SIGNIN_UNAVAILABLE_MSG);
+  if (__DEV__ && e) {
+    console.warn("[GoogleSignIn] failed:", googleErrorCode(e));
+  }
+  onError?.(googleErrorMessage(e));
 }
 
 function validateGoogleClientIds(extra: GoogleOAuthExtra | undefined): string | null {

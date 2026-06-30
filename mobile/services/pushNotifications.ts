@@ -10,8 +10,41 @@ import { usersApi } from './api';
 import { API_URL } from '../constants/config';
 
 const PUSH_TOKEN_CACHE_KEY = 'allconnect:push-token';
+const PUSH_LAST_STATUS_KEY = 'allconnect:push-last-status';
 
 type NotificationsModule = typeof import('expo-notifications');
+
+type PushRegistrationStatus = {
+  ok: boolean;
+  stage: string;
+  reason?: string;
+  tokenTail?: string;
+  at: string;
+};
+
+function tokenTail(token: string | null | undefined): string | undefined {
+  if (!token) return undefined;
+  return token.slice(-12);
+}
+
+async function savePushStatus(status: Omit<PushRegistrationStatus, 'at'>): Promise<void> {
+  const payload: PushRegistrationStatus = { ...status, at: new Date().toISOString() };
+  try {
+    await AsyncStorage.setItem(PUSH_LAST_STATUS_KEY, JSON.stringify(payload));
+  } catch {}
+  if (__DEV__ && !payload.ok) {
+    console.warn('[PushNotifications]', payload.stage, payload.reason || 'failed');
+  }
+}
+
+export async function getLastPushRegistrationStatus(): Promise<PushRegistrationStatus | null> {
+  try {
+    const raw = await AsyncStorage.getItem(PUSH_LAST_STATUS_KEY);
+    return raw ? (JSON.parse(raw) as PushRegistrationStatus) : null;
+  } catch {
+    return null;
+  }
+}
 
 async function getNotifications(): Promise<NotificationsModule | null> {
   if (isExpoGo()) return null;
@@ -39,13 +72,22 @@ async function ensureNotificationHandler(Notifications: NotificationsModule): Pr
 }
 
 export async function registerForPushNotificationsAsync(): Promise<string | null> {
-  if (isExpoGo()) return null;
+  if (isExpoGo()) {
+    await savePushStatus({ ok: false, stage: 'environment', reason: 'Expo Go does not support production push registration' });
+    return null;
+  }
 
   const Notifications = await getNotifications();
-  if (!Notifications) return null;
+  if (!Notifications) {
+    await savePushStatus({ ok: false, stage: 'load-module', reason: 'expo-notifications could not be loaded' });
+    return null;
+  }
 
   const Device = await import('expo-device');
-  if (!Device.isDevice) return null;
+  if (!Device.isDevice) {
+    await savePushStatus({ ok: false, stage: 'device', reason: 'Push notifications require a physical device' });
+    return null;
+  }
 
   await ensureNotificationHandler(Notifications);
 
@@ -64,11 +106,27 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
     const { status } = await Notifications.requestPermissionsAsync();
     finalStatus = status;
   }
-  if (finalStatus !== 'granted') return null;
+  if (finalStatus !== 'granted') {
+    await savePushStatus({ ok: false, stage: 'permission', reason: `Notification permission is ${finalStatus}` });
+    return null;
+  }
   const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
-  if (!projectId) return null;
-  const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-  return token;
+  if (!projectId) {
+    await savePushStatus({ ok: false, stage: 'project-id', reason: 'Missing EAS project id' });
+    return null;
+  }
+  try {
+    const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+    await savePushStatus({ ok: true, stage: 'token-created', tokenTail: tokenTail(token) });
+    return token;
+  } catch (err: any) {
+    await savePushStatus({
+      ok: false,
+      stage: 'token-create',
+      reason: err?.message || 'Could not create Expo push token',
+    });
+    return null;
+  }
 }
 
 export async function registerPushTokenWithBackend(): Promise<void> {
@@ -78,7 +136,14 @@ export async function registerPushTokenWithBackend(): Promise<void> {
   try {
     await usersApi.registerPushToken(token, Platform.OS);
     await AsyncStorage.setItem(PUSH_TOKEN_CACHE_KEY, token);
+    await savePushStatus({ ok: true, stage: 'backend-registered', tokenTail: tokenTail(token) });
   } catch {
+    await savePushStatus({
+      ok: false,
+      stage: 'backend-register',
+      reason: 'Backend rejected or could not save push token',
+      tokenTail: tokenTail(token),
+    });
     // Silent fail — push registration is best-effort
   }
 }

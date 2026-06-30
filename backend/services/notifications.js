@@ -14,6 +14,15 @@ function getExpo() {
   return expo;
 }
 
+async function removeDeviceToken(token) {
+  if (!token) return;
+  try {
+    await db.query('DELETE FROM device_tokens WHERE token = $1', [token]);
+  } catch (err) {
+    console.error('Push token cleanup error:', err);
+  }
+}
+
 async function ensureNotificationsTable() {
   if (ensuredTable) return;
   await db.query(
@@ -72,16 +81,57 @@ async function sendPushToUser(userId, payload) {
       body: payload.body || '',
       data: payload.data || {},
       sound: 'default',
+      channelId: 'default',
       priority: 'high',
     }));
   if (!messages.length) return;
   const client = getExpo();
   const chunks = client.chunkPushNotifications(messages);
+  const receiptTokenById = new Map();
   for (const chunk of chunks) {
     try {
-      await client.sendPushNotificationsAsync(chunk);
+      const tickets = await client.sendPushNotificationsAsync(chunk);
+      tickets.forEach((ticket, index) => {
+        const target = chunk[index]?.to;
+        if (ticket.status === 'ok' && ticket.id) {
+          receiptTokenById.set(ticket.id, target);
+          return;
+        }
+        if (ticket.status === 'error') {
+          console.error('Push ticket error:', {
+            tokenTail: typeof target === 'string' ? target.slice(-12) : '',
+            message: ticket.message,
+            details: ticket.details,
+          });
+          if (ticket.details?.error === 'DeviceNotRegistered') {
+            void removeDeviceToken(target);
+          }
+        }
+      });
     } catch (err) {
       console.error('Push send error:', err);
+    }
+  }
+  const receiptIds = Array.from(receiptTokenById.keys());
+  if (!receiptIds.length) return;
+  const receiptChunks = client.chunkPushNotificationReceiptIds(receiptIds);
+  for (const receiptChunk of receiptChunks) {
+    try {
+      const receipts = await client.getPushNotificationReceiptsAsync(receiptChunk);
+      for (const [receiptId, receipt] of Object.entries(receipts)) {
+        if (receipt.status !== 'error') continue;
+        const token = receiptTokenById.get(receiptId);
+        console.error('Push receipt error:', {
+          tokenTail: typeof token === 'string' ? token.slice(-12) : '',
+          message: receipt.message,
+          details: receipt.details,
+        });
+        if (receipt.details?.error === 'DeviceNotRegistered') {
+          void removeDeviceToken(token);
+        }
+      }
+    } catch (err) {
+      console.error('Push receipt fetch error:', err);
     }
   }
 }
