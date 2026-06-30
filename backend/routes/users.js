@@ -47,6 +47,10 @@ function isExpoPushToken(token) {
   return token.startsWith('ExponentPushToken[') || token.startsWith('ExpoPushToken[');
 }
 
+function normalizeOptionalToken(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
 router.use(authMiddleware);
 
 // GET /api/users/badges — tab counts (chats unread, history pending approvals, notification inbox)
@@ -150,20 +154,36 @@ router.post('/avatar', rateLimitAvatar, async (req, res) => {
 // POST /api/users/push-token — register Expo push token
 router.post('/push-token', rateLimitPushToken, async (req, res) => {
   try {
-    const token = (req.body?.token || '').trim();
-    const platform = (req.body?.platform || 'unknown').trim();
-    if (!token) return res.status(400).json({ error: 'token required' });
-    if (!isExpoPushToken(token)) return res.status(400).json({ error: 'invalid push token' });
-    await db.query(
-      'DELETE FROM device_tokens WHERE token = $1 AND user_id != $2',
-      [token, req.userId]
-    );
-    await db.query(
-      `INSERT INTO device_tokens (user_id, token, platform)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (user_id, token) DO UPDATE SET platform = $3, created_at = NOW()`,
-      [req.userId, token, platform]
-    );
+    const token = normalizeOptionalToken(req.body?.token);
+    const fcmToken = normalizeOptionalToken(req.body?.fcm_token);
+    const platform = normalizeOptionalToken(req.body?.platform) || 'unknown';
+    if (!token && !fcmToken) return res.status(400).json({ error: 'token required' });
+    if (token && !isExpoPushToken(token)) return res.status(400).json({ error: 'invalid push token' });
+    await ensureNotificationsTable();
+    if (token) {
+      await db.query(
+        'DELETE FROM device_tokens WHERE token = $1 AND user_id != $2',
+        [token, req.userId]
+      );
+      await db.query(
+        `INSERT INTO device_tokens (user_id, token, platform)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (user_id, token) DO UPDATE SET platform = $3, created_at = NOW()`,
+        [req.userId, token, platform]
+      );
+    }
+    if (fcmToken) {
+      await db.query(
+        'DELETE FROM fcm_device_tokens WHERE token = $1 AND user_id != $2',
+        [fcmToken, req.userId]
+      );
+      await db.query(
+        `INSERT INTO fcm_device_tokens (user_id, token, platform)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (user_id, token) DO UPDATE SET platform = $3, created_at = NOW()`,
+        [req.userId, fcmToken, platform]
+      );
+    }
     return res.json({ success: true });
   } catch (err) {
     console.error('users/push-token', err);
@@ -174,9 +194,16 @@ router.post('/push-token', rateLimitPushToken, async (req, res) => {
 // DELETE /api/users/push-token — unregister Expo push token
 router.delete('/push-token', rateLimitPushToken, async (req, res) => {
   try {
-    const token = (req.body?.token || '').trim();
-    if (!token) return res.status(400).json({ error: 'token required' });
-    await db.query('DELETE FROM device_tokens WHERE user_id = $1 AND token = $2', [req.userId, token]);
+    const token = normalizeOptionalToken(req.body?.token);
+    const fcmToken = normalizeOptionalToken(req.body?.fcm_token);
+    if (!token && !fcmToken) return res.status(400).json({ error: 'token required' });
+    if (token) {
+      await db.query('DELETE FROM device_tokens WHERE user_id = $1 AND token = $2', [req.userId, token]);
+    }
+    if (fcmToken) {
+      await ensureNotificationsTable();
+      await db.query('DELETE FROM fcm_device_tokens WHERE user_id = $1 AND token = $2', [req.userId, fcmToken]);
+    }
     return res.json({ success: true });
   } catch (err) {
     console.error('users/push-token delete', err);

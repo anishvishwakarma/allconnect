@@ -102,10 +102,22 @@ export async function getCurrentFirebaseIdToken(): Promise<string | null> {
 
 export async function sendPasswordReset(email: string): Promise<void> {
   const auth = getFirebaseAuthInstance();
-  await sendPasswordResetEmail(auth, email.trim().toLowerCase(), {
-    url: PASSWORD_RESET_CONTINUE_URL,
-    handleCodeInApp: false,
-  });
+  const normalizedEmail = email.trim().toLowerCase();
+  try {
+    await sendPasswordResetEmail(auth, normalizedEmail, {
+      url: PASSWORD_RESET_CONTINUE_URL,
+      handleCodeInApp: false,
+    });
+  } catch (err: any) {
+    const msg = String(err?.code || err?.message || '');
+    const continueUrlRejected =
+      msg.includes('auth/unauthorized-continue-uri') ||
+      msg.includes('auth/invalid-continue-uri') ||
+      msg.includes('auth/missing-continue-uri') ||
+      msg.includes('continue');
+    if (!continueUrlRejected) throw err;
+    await sendPasswordResetEmail(auth, normalizedEmail);
+  }
 }
 
 export async function signOutFirebase(): Promise<void> {

@@ -133,32 +133,6 @@ function GoogleSignInButtonContent({ textColor }: { textColor: string }) {
   );
 }
 
-/** Expo Go: show button but never open Google browser (redirect_uri_mismatch). */
-function GoogleSignInExpoGoPlaceholder({
-  disabled,
-  borderColor,
-  backgroundColor,
-  textColor,
-  onError,
-}: {
-  disabled?: boolean;
-  borderColor: string;
-  backgroundColor: string;
-  textColor: string;
-  onError?: (message: string) => void;
-}) {
-  return (
-    <TouchableOpacity
-      style={[styles.googleBtn, { borderColor, backgroundColor }]}
-      disabled={disabled}
-      onPress={() => notifyGoogleError(onError)}
-      activeOpacity={0.85}
-    >
-      <GoogleSignInButtonContent textColor={textColor} />
-    </TouchableOpacity>
-  );
-}
-
 function GoogleSignInBrowser({
   onIdToken,
   disabled,
@@ -231,6 +205,26 @@ function GoogleSignInNative({
   onError?: (message: string) => void;
 }) {
   const extra = getGoogleExtra();
+  const lastHandled = useRef<string | null>(null);
+  const [browserRequest, browserResponse, promptBrowserAsync] = Google.useIdTokenAuthRequest(googleAuthRequestConfig(extra));
+
+  useEffect(() => {
+    if (!browserResponse) return;
+    if (browserResponse.type === "error") {
+      notifyGoogleError(onError);
+      return;
+    }
+    if (browserResponse.type !== "success") return;
+    const idToken =
+      typeof browserResponse.params?.id_token === "string" ? browserResponse.params.id_token : "";
+    if (!idToken) {
+      notifyGoogleError(onError);
+      return;
+    }
+    if (lastHandled.current === idToken) return;
+    lastHandled.current = idToken;
+    onIdToken(idToken);
+  }, [browserResponse, onIdToken, onError]);
 
   useEffect(() => {
     const web = extra?.webClientId?.trim();
@@ -278,6 +272,10 @@ function GoogleSignInNative({
       onIdToken(idToken);
     } catch (e: unknown) {
       if (isSignInCancelled(e)) return;
+      if (browserRequest) {
+        void promptBrowserAsync().catch((err) => notifyGoogleError(onError, err));
+        return;
+      }
       notifyGoogleError(onError, e);
     }
   }
@@ -295,8 +293,8 @@ function GoogleSignInNative({
 }
 
 /**
- * Expo Go: friendly in-app message only (no Google browser).
- * Web: browser OAuth. Production: native Google Play / iOS SDK.
+ * Expo Go/web: browser OAuth. Production native builds: Google Play / iOS SDK,
+ * with browser OAuth as a fallback if native sign-in is misconfigured.
  */
 export function GoogleSignInButton({
   onIdToken,
@@ -313,18 +311,7 @@ export function GoogleSignInButton({
   textColor: string;
   onError?: (message: string) => void;
 }) {
-  if (isExpoGo()) {
-    return (
-      <GoogleSignInExpoGoPlaceholder
-        disabled={disabled}
-        borderColor={borderColor}
-        backgroundColor={backgroundColor}
-        textColor={textColor}
-        onError={onError}
-      />
-    );
-  }
-  if (Platform.OS === "web") {
+  if (isExpoGo() || Platform.OS === "web") {
     return (
       <GoogleSignInBrowser
         onIdToken={onIdToken}

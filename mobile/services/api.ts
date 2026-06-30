@@ -142,10 +142,10 @@ export const usersApi = {
       body: JSON.stringify({ image: base64Image }),
       timeoutMs: 30000,
     }),
-  registerPushToken: (token: string, platform?: string) =>
+  registerPushToken: (token?: string | null, platform?: string, fcmToken?: string | null) =>
     request<{ success: boolean }>('/api/users/push-token', {
       method: 'POST',
-      body: JSON.stringify({ token, platform }),
+      body: JSON.stringify({ token, platform, fcm_token: fcmToken }),
     }),
   unregisterPushToken: (token: string) =>
     request<{ success: boolean }>('/api/users/push-token', {

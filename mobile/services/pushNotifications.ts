@@ -10,6 +10,7 @@ import { usersApi } from './api';
 import { API_URL } from '../constants/config';
 
 const PUSH_TOKEN_CACHE_KEY = 'allconnect:push-token';
+const FCM_TOKEN_CACHE_KEY = 'allconnect:fcm-token';
 const PUSH_LAST_STATUS_KEY = 'allconnect:push-last-status';
 
 type NotificationsModule = typeof import('expo-notifications');
@@ -129,20 +130,81 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
   }
 }
 
+export async function registerForFirebasePushTokenAsync(): Promise<string | null> {
+  if (isExpoGo()) return null;
+  if (Platform.OS !== 'android') return null;
+
+  const Notifications = await getNotifications();
+  if (!Notifications) {
+    await savePushStatus({ ok: false, stage: 'fcm-load-module', reason: 'expo-notifications could not be loaded' });
+    return null;
+  }
+
+  const Device = await import('expo-device');
+  if (!Device.isDevice) {
+    await savePushStatus({ ok: false, stage: 'fcm-device', reason: 'Firebase push requires a physical Android device' });
+    return null;
+  }
+
+  await ensureNotificationHandler(Notifications);
+  await Notifications.setNotificationChannelAsync('default', {
+    name: 'default',
+    importance: Notifications.AndroidImportance.MAX,
+    vibrationPattern: [0, 250, 250, 250],
+    lightColor: '#E8751A',
+    sound: 'default',
+  });
+
+  const { status: existing } = await Notifications.getPermissionsAsync();
+  let finalStatus = existing;
+  if (existing !== 'granted') {
+    const { status } = await Notifications.requestPermissionsAsync();
+    finalStatus = status;
+  }
+  if (finalStatus !== 'granted') {
+    await savePushStatus({ ok: false, stage: 'fcm-permission', reason: `Notification permission is ${finalStatus}` });
+    return null;
+  }
+
+  try {
+    const nativeToken = await Notifications.getDevicePushTokenAsync();
+    const token = typeof nativeToken.data === 'string' ? nativeToken.data : '';
+    if (!token) {
+      await savePushStatus({ ok: false, stage: 'fcm-token-empty', reason: 'Firebase device token was empty' });
+      return null;
+    }
+    await savePushStatus({ ok: true, stage: 'fcm-token-created', tokenTail: tokenTail(token) });
+    return token;
+  } catch (err: any) {
+    await savePushStatus({
+      ok: false,
+      stage: 'fcm-token-create',
+      reason: err?.message || 'Could not create Firebase device token',
+    });
+    return null;
+  }
+}
+
 export async function registerPushTokenWithBackend(): Promise<void> {
   if (isExpoGo()) return;
   const token = await registerForPushNotificationsAsync();
-  if (!token) return;
+  const fcmToken = await registerForFirebasePushTokenAsync();
+  if (!token && !fcmToken) return;
   try {
-    await usersApi.registerPushToken(token, Platform.OS);
-    await AsyncStorage.setItem(PUSH_TOKEN_CACHE_KEY, token);
-    await savePushStatus({ ok: true, stage: 'backend-registered', tokenTail: tokenTail(token) });
+    await usersApi.registerPushToken(token, Platform.OS, fcmToken);
+    if (token) await AsyncStorage.setItem(PUSH_TOKEN_CACHE_KEY, token);
+    if (fcmToken) await AsyncStorage.setItem(FCM_TOKEN_CACHE_KEY, fcmToken);
+    await savePushStatus({
+      ok: true,
+      stage: fcmToken ? 'backend-registered-with-fcm' : 'backend-registered',
+      tokenTail: tokenTail(fcmToken || token),
+    });
   } catch {
     await savePushStatus({
       ok: false,
       stage: 'backend-register',
       reason: 'Backend rejected or could not save push token',
-      tokenTail: tokenTail(token),
+      tokenTail: tokenTail(fcmToken || token),
     });
     // Silent fail — push registration is best-effort
   }
@@ -152,7 +214,8 @@ export async function unregisterPushTokenWithBackend(authToken?: string | null):
   if (isExpoGo()) return;
   try {
     const token = await AsyncStorage.getItem(PUSH_TOKEN_CACHE_KEY);
-    if (!token) return;
+    const fcmToken = await AsyncStorage.getItem(FCM_TOKEN_CACHE_KEY);
+    if (!token && !fcmToken) return;
     if (authToken) {
       await fetch(`${API_URL}/api/users/push-token`, {
         method: 'DELETE',
@@ -160,12 +223,13 @@ export async function unregisterPushTokenWithBackend(authToken?: string | null):
           'Content-Type': 'application/json',
           Authorization: `Bearer ${authToken}`,
         },
-        body: JSON.stringify({ token }),
+        body: JSON.stringify({ token, fcm_token: fcmToken }),
       });
     } else {
-      await usersApi.unregisterPushToken(token);
+      if (token) await usersApi.unregisterPushToken(token);
     }
     await AsyncStorage.removeItem(PUSH_TOKEN_CACHE_KEY);
+    await AsyncStorage.removeItem(FCM_TOKEN_CACHE_KEY);
   } catch {
     // Silent fail — logout should still proceed
   }
