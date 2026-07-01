@@ -27,7 +27,7 @@ function getGoogleExtra(): GoogleOAuthExtra | undefined {
   return Constants.expoConfig?.extra?.google as GoogleOAuthExtra | undefined;
 }
 
-/** Expo Go cannot use exp:// redirects — Google requires https://auth.expo.io/@owner/slug on the Web OAuth client. */
+/** Browser OAuth is used only on web. Native Android/iOS uses the Google Sign-In SDK. */
 function getGoogleOAuthRedirectUri(): string {
   if (!isExpoGo()) {
     return makeRedirectUri({ scheme: "allconnect" });
@@ -41,7 +41,7 @@ function getGoogleOAuthRedirectUri(): string {
   return `https://auth.expo.io/@${owner}/${slug}`;
 }
 
-/** Web only — Expo Go cannot use browser Google OAuth reliably (redirect_uri_mismatch). */
+/** Web only — native apps should not use browser redirects for Google Sign-In. */
 function googleAuthRequestConfig(extra: GoogleOAuthExtra | undefined) {
   const web = extra?.webClientId?.trim() || "";
   return {
@@ -52,7 +52,7 @@ function googleAuthRequestConfig(extra: GoogleOAuthExtra | undefined) {
   };
 }
 
-/** Show Google button when web client ID exists. Expo Go shows friendly message on tap (no browser). */
+/** Show Google button when web client ID exists. Expo Go shows friendly message on tap. */
 export function isGoogleOAuthConfigured(): boolean {
   const g = getGoogleExtra();
   if (!g?.webClientId?.trim()) return false;
@@ -133,6 +133,31 @@ function GoogleSignInButtonContent({ textColor }: { textColor: string }) {
   );
 }
 
+function GoogleSignInUnavailableButton({
+  disabled,
+  borderColor,
+  backgroundColor,
+  textColor,
+  onError,
+}: {
+  disabled?: boolean;
+  borderColor: string;
+  backgroundColor: string;
+  textColor: string;
+  onError?: (message: string) => void;
+}) {
+  return (
+    <TouchableOpacity
+      style={[styles.googleBtn, { borderColor, backgroundColor }]}
+      disabled={disabled}
+      onPress={() => notifyGoogleError(onError)}
+      activeOpacity={0.85}
+    >
+      <GoogleSignInButtonContent textColor={textColor} />
+    </TouchableOpacity>
+  );
+}
+
 function GoogleSignInBrowser({
   onIdToken,
   disabled,
@@ -149,9 +174,9 @@ function GoogleSignInBrowser({
   onError?: (message: string) => void;
 }) {
   const extra = getGoogleExtra();
-  const lastHandled = useRef<string | null>(null);
 
   const [request, response, promptAsync] = Google.useIdTokenAuthRequest(googleAuthRequestConfig(extra));
+  const lastHandled = useRef<string | null>(null);
 
   useEffect(() => {
     if (!response) return;
@@ -205,26 +230,6 @@ function GoogleSignInNative({
   onError?: (message: string) => void;
 }) {
   const extra = getGoogleExtra();
-  const lastHandled = useRef<string | null>(null);
-  const [browserRequest, browserResponse, promptBrowserAsync] = Google.useIdTokenAuthRequest(googleAuthRequestConfig(extra));
-
-  useEffect(() => {
-    if (!browserResponse) return;
-    if (browserResponse.type === "error") {
-      notifyGoogleError(onError);
-      return;
-    }
-    if (browserResponse.type !== "success") return;
-    const idToken =
-      typeof browserResponse.params?.id_token === "string" ? browserResponse.params.id_token : "";
-    if (!idToken) {
-      notifyGoogleError(onError);
-      return;
-    }
-    if (lastHandled.current === idToken) return;
-    lastHandled.current = idToken;
-    onIdToken(idToken);
-  }, [browserResponse, onIdToken, onError]);
 
   useEffect(() => {
     const web = extra?.webClientId?.trim();
@@ -272,10 +277,6 @@ function GoogleSignInNative({
       onIdToken(idToken);
     } catch (e: unknown) {
       if (isSignInCancelled(e)) return;
-      if (browserRequest) {
-        void promptBrowserAsync().catch((err) => notifyGoogleError(onError, err));
-        return;
-      }
       notifyGoogleError(onError, e);
     }
   }
@@ -293,8 +294,8 @@ function GoogleSignInNative({
 }
 
 /**
- * Expo Go/web: browser OAuth. Production native builds: Google Play / iOS SDK,
- * with browser OAuth as a fallback if native sign-in is misconfigured.
+ * Web: browser OAuth. Expo Go: friendly unavailable message.
+ * Production native builds: Google Play / iOS SDK only.
  */
 export function GoogleSignInButton({
   onIdToken,
@@ -311,7 +312,18 @@ export function GoogleSignInButton({
   textColor: string;
   onError?: (message: string) => void;
 }) {
-  if (isExpoGo() || Platform.OS === "web") {
+  if (isExpoGo()) {
+    return (
+      <GoogleSignInUnavailableButton
+        disabled={disabled}
+        borderColor={borderColor}
+        backgroundColor={backgroundColor}
+        textColor={textColor}
+        onError={onError}
+      />
+    );
+  }
+  if (Platform.OS === "web") {
     return (
       <GoogleSignInBrowser
         onIdToken={onIdToken}
